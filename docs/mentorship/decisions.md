@@ -26,6 +26,7 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 | D-17 | 2026-10-24 | Auto-learn: per-pose capture instead of a frame burst | AGENT (you architect) | decided: B motion-gated, built |
 | D-18 | 2026-10-24 | T9 port of instructor utilities + model handling | AGENT | decided, built |
 | D-19 | 2026-10-24 | Model delivery for the Netlify (browser) version | AGENT (you architect) | decided: build-time fetch + cache (LFS question open) |
+| D-20 | 2026-10-24 | T2 grassfire body written by agent from your pseudocode | AGENT (your design) | decided; explain-it-back pending |
 | D-05 | 2026-10-23 | Headless tests + 4/8-conn visual dump for from-scratch stages | AGENT harness, HAND expected values | decided |
 
 ---
@@ -245,3 +246,11 @@ The model isn't in git, so Netlify's build must get it some other way. Options a
 
 - **D-17:** B, auto-capture on move. Built: a new pose needs ≥ 10% diagonal move or ≥ 20° rotation (undirected axis), then 0.6 s still; 5 poses; Stop = keep samples + no re-prompt until the object leaves.
 - **D-19:** ResNet18 fetched at Netlify build time (URL + SHA-256 from `data/models/README.md`), served with a content-hashed filename and `Cache-Control: immutable` so returning users don't re-download. **Open:** Git LFS instead. You like its workflow fit; how Netlify builds treat LFS objects is unverified (check Netlify's docs), and builds pulling LFS objects use GitHub's LFS bandwidth quota.
+
+## D-20 — T2 implementation handed to the agent (amends D-11)
+
+**Status:** decided 2026-10-24, at your request ("fill it in based on what I commented").
+**Trade-off stated:** the requirement is still met by T1 (ISODATA + applyThreshold, hand-written). The ">1 stage from scratch" extension and the Q&A now rest on you being able to explain grassfire, so the explain-it-back check is the condition.
+**Implemented as you specified:** forward pass assigns `min(UP, LEFT [, UP_LEFT, UP_RIGHT]) + 1` with bg/fg init in the same loop; backward `min(curr, min(DOWN, RIGHT [, DOWN_LEFT, DOWN_RIGHT]) + 1)`; shrink removes `dist <= n`.
+**Where it differs from your comments:** (1) grow runs grassfire on the *inverted* image and keeps `dist <= n` (your comment had `>= n` on the original); (2) grow treats outside-the-image as *far* (rows + cols), not as background. Otherwise every bg pixel within n of the image edge would turn fg, because in the inverted image the D-08 border policy means "the border is original foreground".
+**Verified:** tests.exe 0 failed; out/tests shows the diamond (4-conn) vs square (8-conn).

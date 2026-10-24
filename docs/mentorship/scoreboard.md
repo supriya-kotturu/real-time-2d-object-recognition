@@ -6,7 +6,7 @@ Rules:
 - **−1** — a hint already given (listed in `hints.md`) has to be given again.
 - Progress update every 6h of active work. Measured from the `Last update` timestamp below; checked at the start of every session.
 
-**Total: +10**
+**Total: +7**
 **Last update:** 2026-10-24 ~00:00 (checkpoint 1). Next one due after 6 more hours of work.
 
 ## Ledger
@@ -48,6 +48,13 @@ Rules:
 | 2026-10-24 | +1 | Designed GUI modes (detect w/ auto-learn prompt vs collect) that map directly onto the task's evaluation hook + auto-learn extension | D-15 |
 | 2026-10-24 | +1 | Rejected YOLO on concrete costs (per-class retraining, no server compute on Netlify) instead of hype | D-16 |
 | 2026-10-24 | +1 | Spotted that a burst of near-identical frames gives no pose diversity (also the root cause of the zero-stdev bug); proposed per-pose capture | D-17 |
+| 2026-10-24 | −1 | H-34 repeated: INF reasoned from CV_8UC1, but the distance image is CV_32S (D-08); INT_MAX + 1 overflows | H-34 |
+| 2026-10-24 | +1 | Grassfire pseudocode: backward-pass rule exactly right (`min(curr, min(DOWN,RIGHT)+1)`) and border = bg applied from D-08 without prompting | H-06, D-08 |
+| 2026-10-24 | −1 | H-33 repeated: `dest.setTo(INFINITY)` initialises every pixel to INF; bg must start at 0 | H-33 |
+| 2026-10-24 | −1 | H-42 repeated (one message after it was given): distance image created as `frame.type()` (CV_8UC1) and INF = float INFINITY | H-42 |
+| 2026-10-24 | +1 | Correct 8-conn neighbour sets for both passes; INF = rows + cols; forward pass restricted to fg | H-32, H-42 |
+| 2026-10-24 | −1 | H-33 repeated (2nd time): every pixel still set to INF; bg must start at 0 | H-33 |
+| 2026-10-24 | −1 | H-45 repeated: local distance Mat put inside grassfire instead of shrink/grow; grassfire's own output became CV_8UC1 | H-45 |
 
 ## Progress updates
 
