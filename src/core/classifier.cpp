@@ -1,5 +1,6 @@
 #include "core/classifier.h"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -16,8 +17,14 @@ std::vector<double> featureStdevs(const std::vector<Sample>& db) {
     for (const auto& s : db)
         for (size_t i = 0; i < k; ++i) var[i] += (s.features[i] - mean[i]) * (s.features[i] - mean[i]);
 
+    // Floor at 1% of the feature's magnitude. A near-zero stdev (one class, or identical
+    // samples) must not be skipped: skipping every feature makes every distance 0, so any
+    // object matches. Flooring keeps the feature in play without letting noise explode it.
     std::vector<double> stdevs(k);
-    for (size_t i = 0; i < k; ++i) stdevs[i] = std::sqrt(var[i] / static_cast<double>(db.size()));
+    for (size_t i = 0; i < k; ++i) {
+        const double sd = std::sqrt(var[i] / static_cast<double>(db.size()));
+        stdevs[i] = std::max({sd, 0.01 * std::abs(mean[i]), 1e-9});
+    }
     return stdevs;
 }
 
@@ -25,9 +32,6 @@ double scaledEuclidean(const std::vector<double>& a, const std::vector<double>& 
                        const std::vector<double>& stdevs) {
     double sum = 0.0;
     for (size_t i = 0; i < a.size(); ++i) {
-        // A feature constant across the DB can't discriminate; skipping it avoids dividing
-        // by ~0, which would let its noise dominate the distance.
-        if (stdevs[i] < 1e-12) continue;
         const double d = (a[i] - b[i]) / stdevs[i];
         sum += d * d;
     }
