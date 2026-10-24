@@ -26,13 +26,15 @@ void segmentRegions(const cv::Mat& binary, int minArea, int maxRegions, cv::Mat&
     for (int k = 0; k < static_cast<int>(keep.size()); ++k) {
         const int old = keep[k];
         remap[old] = k + 1;
-        const cv::Rect box(stats.at<int>(old, cv::CC_STAT_LEFT), stats.at<int>(old, cv::CC_STAT_TOP),
-                           stats.at<int>(old, cv::CC_STAT_WIDTH),
-                           stats.at<int>(old, cv::CC_STAT_HEIGHT));
-        const bool border = box.x == 0 || box.y == 0 || box.br().x >= binary.cols ||
-                            box.br().y >= binary.rows;
-        regions.push_back({k + 1, area(old),
-                           {centroids.at<double>(old, 0), centroids.at<double>(old, 1)}, box,
+        const cv::Rect box(
+            stats.at<int>(old, cv::CC_STAT_LEFT), stats.at<int>(old, cv::CC_STAT_TOP),
+            stats.at<int>(old, cv::CC_STAT_WIDTH), stats.at<int>(old, cv::CC_STAT_HEIGHT));
+        const bool border =
+            box.x == 0 || box.y == 0 || box.br().x >= binary.cols || box.br().y >= binary.rows;
+        regions.push_back({k + 1,
+                           area(old),
+                           {centroids.at<double>(old, 0), centroids.at<double>(old, 1)},
+                           box,
                            border});
     }
 

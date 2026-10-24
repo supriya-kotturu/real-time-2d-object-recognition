@@ -10,7 +10,8 @@ namespace {
 const char* kEmbeddingLayer = "onnx_node!resnetv22_flatten0_reshape0";
 
 // Sign of the third central moment along the axis: which end carries the long tail.
-double axisSkew(const cv::Mat& regionMap, int regionId, const objectrecognition::RegionFeatures& f) {
+double axisSkew(const cv::Mat& regionMap, int regionId,
+                const objectrecognition::RegionFeatures& f) {
     const double ct = std::cos(f.theta), st = std::sin(f.theta);
     double m3 = 0;
     for (int r = 0; r < regionMap.rows; ++r) {

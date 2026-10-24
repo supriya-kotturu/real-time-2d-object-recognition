@@ -70,6 +70,7 @@ int main(int argc, char** argv) {
         csv << '\n';
         std::cout << "\n";
     }
-    std::cout << "wrote " << out.string() << "/{threshold,regions,features,roi}/ and features.csv\n";
+    std::cout << "wrote " << out.string()
+              << "/{threshold,regions,features,roi}/ and features.csv\n";
     return 0;
 }

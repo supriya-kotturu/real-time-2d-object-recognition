@@ -20,8 +20,7 @@ std::string timestamp() {
     localtime_r(&secs, &local);
 #endif
     std::ostringstream out;
-    out << std::put_time(&local, "%Y%m%d-%H%M%S") << '-' << std::setw(3) << std::setfill('0')
-        << ms;
+    out << std::put_time(&local, "%Y%m%d-%H%M%S") << '-' << std::setw(3) << std::setfill('0') << ms;
     return out.str();
 }
 
@@ -32,7 +31,6 @@ void saveImage(const std::filesystem::path& dir, const std::string& file, const 
 
 bool isValidLabel(const std::string& label) {
     return !label.empty() && label.size() <= 64 &&
-           std::all_of(label.begin(), label.end(), [](unsigned char c) {
-               return std::isalnum(c) || c == '_' || c == '-';
-           });
+           std::all_of(label.begin(), label.end(),
+                       [](unsigned char c) { return std::isalnum(c) || c == '_' || c == '-'; });
 }

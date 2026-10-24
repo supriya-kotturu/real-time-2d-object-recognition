@@ -37,8 +37,8 @@ struct Item {
     std::vector<double> features, embedding;
 };
 
-using Classify = std::function<orec::Match(const std::vector<orec::Sample>&,
-                                           const std::vector<double>&)>;
+using Classify =
+    std::function<orec::Match(const std::vector<orec::Sample>&, const std::vector<double>&)>;
 using Pick = std::function<const std::vector<double>&(const Item&)>;
 
 void report(const std::string& name, const orec::ConfusionMatrix& m,
@@ -109,8 +109,10 @@ int main(int argc, char** argv) {
     }
 
     std::unique_ptr<Embedder> embedder;
-    if (fs::exists(modelPath)) embedder = std::make_unique<Embedder>(modelPath);
-    else std::cout << "(no model at " << modelPath << ": embedding comparison skipped)\n";
+    if (fs::exists(modelPath))
+        embedder = std::make_unique<Embedder>(modelPath);
+    else
+        std::cout << "(no model at " << modelPath << ": embedding comparison skipped)\n";
 
     std::vector<Item> items;
     FrameResult r;
@@ -144,18 +146,18 @@ int main(int argc, char** argv) {
     }
     std::cout << "protocol: " << protocol << ", " << items.size() << " images\n";
 
-    run("features", items, protocol, fixedDb, [](const Item& it) -> const std::vector<double>& {
-            return it.features;
-        },
+    run(
+        "features", items, protocol, fixedDb,
+        [](const Item& it) -> const std::vector<double>& { return it.features; },
         [&](const std::vector<orec::Sample>& db, const std::vector<double>& f) {
             return orec::classifyNearest(db, orec::featureStdevs(db), f, unknownThreshold);
         });
 
     // A fixed hand-feature DB has no embeddings, so that protocol compares features only.
     if (embedder && protocol != "db") {
-        run("embedding", items, protocol, {}, [](const Item& it) -> const std::vector<double>& {
-                return it.embedding;
-            },
+        run(
+            "embedding", items, protocol, {},
+            [](const Item& it) -> const std::vector<double>& { return it.embedding; },
             [&](const std::vector<orec::Sample>& db, const std::vector<double>& e) {
                 return orec::classifyCosine(db, e, unknownThreshold);
             });

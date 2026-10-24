@@ -79,9 +79,15 @@ std::string jsonEscape(const std::string& s) {
     std::string out;
     for (char ch : s) {
         switch (ch) {
-            case '"': out += "\\\""; break;
-            case '\\': out += "\\\\"; break;
-            case '\n': out += "\\n"; break;
+            case '"':
+                out += "\\\"";
+                break;
+            case '\\':
+                out += "\\\\";
+                break;
+            case '\n':
+                out += "\\n";
+                break;
             default:
                 if (static_cast<unsigned char>(ch) < 0x20) continue;
                 out += ch;
@@ -103,8 +109,7 @@ bool extractString(const std::string& body, const std::string& key, std::string&
 
 bool extractNumber(const std::string& body, const std::string& key, double& out) {
     std::smatch m;
-    if (!std::regex_search(body, m,
-                           std::regex("\"" + key + "\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?)")))
+    if (!std::regex_search(body, m, std::regex("\"" + key + "\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?)")))
         return false;
     out = std::stod(m[1]);
     return true;
@@ -156,9 +161,8 @@ int main(int argc, char** argv) {
                 std::vector<uchar> buf;
                 {
                     std::unique_lock lock(shared.m);
-                    shared.frameReady.wait_for(lock, 1s, [&] {
-                        return shared.frameId != last || !shared.running;
-                    });
+                    shared.frameReady.wait_for(
+                        lock, 1s, [&] { return shared.frameId != last || !shared.running; });
                     if (!shared.running) return false;
                     if (shared.frameId == last) return true;  // no new frame yet; keep open
                     last = shared.frameId;
@@ -203,7 +207,8 @@ int main(int argc, char** argv) {
         std::ostringstream out;
         const auto list = [&](const std::vector<std::string>& v) {
             out << '[';
-            for (size_t i = 0; i < v.size(); ++i) out << (i ? "," : "") << '"' << jsonEscape(v[i]) << '"';
+            for (size_t i = 0; i < v.size(); ++i)
+                out << (i ? "," : "") << '"' << jsonEscape(v[i]) << '"';
             out << ']';
         };
         out << R"({"rows":)";
@@ -229,8 +234,8 @@ int main(int argc, char** argv) {
         out << R"({"total":)" << db.size() << R"(,"labels":[)";
         bool first = true;
         for (const auto& [name, count] : counts) {
-            out << (first ? "" : ",") << R"({"label":")" << jsonEscape(name)
-                << R"(","count":)" << count << "}";
+            out << (first ? "" : ",") << R"({"label":")" << jsonEscape(name) << R"(","count":)"
+                << count << "}";
             first = false;
         }
         out << "]}";
@@ -241,20 +246,21 @@ int main(int argc, char** argv) {
         sendJson(res, runOnPipeline(shared, [&] { return Reply{200, dbJson()}; }));
     });
 
-    http.Delete(R"(/api/db/([A-Za-z0-9_-]+))", [&](const httplib::Request& req,
-                                                  httplib::Response& res) {
-        const std::string target = req.matches[1];
-        sendJson(res, runOnPipeline(shared, [&, target] {
-            const auto before = db.size();
-            db.erase(std::remove_if(db.begin(), db.end(),
-                                    [&](const orec::Sample& s) { return s.label == target; }),
-                     db.end());
-            if (db.size() == before) return Reply{404, jsonError("no such label")};
-            saveFeatureDb(kDbPath, db);
-            stdevs = orec::featureStdevs(db);
-            return Reply{200, dbJson()};
-        }));
-    });
+    http.Delete(
+        R"(/api/db/([A-Za-z0-9_-]+))", [&](const httplib::Request& req, httplib::Response& res) {
+            const std::string target = req.matches[1];
+            sendJson(res, runOnPipeline(shared, [&, target] {
+                         const auto before = db.size();
+                         db.erase(std::remove_if(
+                                      db.begin(), db.end(),
+                                      [&](const orec::Sample& s) { return s.label == target; }),
+                                  db.end());
+                         if (db.size() == before) return Reply{404, jsonError("no such label")};
+                         saveFeatureDb(kDbPath, db);
+                         stdevs = orec::featureStdevs(db);
+                         return Reply{200, dbJson()};
+                     }));
+        });
 
     http.Post("/api/label", [&](const httplib::Request& req, httplib::Response& res) {
         std::string next;
@@ -263,37 +269,37 @@ int main(int argc, char** argv) {
             return;
         }
         sendJson(res, runOnPipeline(shared, [&, next] {
-            label = next;
-            return Reply{200, R"({"label":")" + label + "\"}"};
-        }));
+                     label = next;
+                     return Reply{200, R"({"label":")" + label + "\"}"};
+                 }));
     });
 
     http.Post("/api/train", [&](const httplib::Request&, httplib::Response& res) {
         sendJson(res, runOnPipeline(shared, [&] {
-            if (label.empty()) return Reply{409, jsonError("set a label first")};
-            if (!result.hasFeatures) return Reply{409, jsonError("no object detected")};
-            addSample(label);
-            return Reply{200, dbJson()};
-        }));
+                     if (label.empty()) return Reply{409, jsonError("set a label first")};
+                     if (!result.hasFeatures) return Reply{409, jsonError("no object detected")};
+                     addSample(label);
+                     return Reply{200, dbJson()};
+                 }));
     });
 
     http.Post("/api/capture", [&](const httplib::Request&, httplib::Response& res) {
         sendJson(res, runOnPipeline(shared, [&] {
-            if (label.empty()) return Reply{409, jsonError("set a label first")};
-            const std::string file = timestamp() + ".png";
-            saveImage(fs::path("data/objects") / label, file, frame);
-            saveImage(fs::path("out/stages/threshold") / label, file, result.binary);
-            saveImage(fs::path("out/stages/regions") / label, file, regionsVis);
-            saveImage(fs::path("out/stages/features") / label, file, display);
-            return Reply{200, R"({"saved":"data/objects/)" + label + "/" + file + "\"}"};
-        }));
+                     if (label.empty()) return Reply{409, jsonError("set a label first")};
+                     const std::string file = timestamp() + ".png";
+                     saveImage(fs::path("data/objects") / label, file, frame);
+                     saveImage(fs::path("out/stages/threshold") / label, file, result.binary);
+                     saveImage(fs::path("out/stages/regions") / label, file, regionsVis);
+                     saveImage(fs::path("out/stages/features") / label, file, display);
+                     return Reply{200, R"({"saved":"data/objects/)" + label + "/" + file + "\"}"};
+                 }));
     });
 
     http.Post("/api/next", [&](const httplib::Request&, httplib::Response& res) {
         sendJson(res, runOnPipeline(shared, [&] {
-            advance = true;
-            return Reply{200, "{}"};
-        }));
+                     advance = true;
+                     return Reply{200, "{}"};
+                 }));
     });
 
     http.Put("/api/settings", [&](const httplib::Request& req, httplib::Response& res) {
@@ -303,9 +309,9 @@ int main(int argc, char** argv) {
             return;
         }
         sendJson(res, runOnPipeline(shared, [&, value] {
-            unknownThreshold = value;
-            return Reply{200, cv::format(R"({"unknownThreshold":%.3f})", value)};
-        }));
+                     unknownThreshold = value;
+                     return Reply{200, cv::format(R"({"unknownThreshold":%.3f})", value)};
+                 }));
     });
 
     http.Put("/api/mode", [&](const httplib::Request& req, httplib::Response& res) {
@@ -316,10 +322,11 @@ int main(int argc, char** argv) {
             return;
         }
         sendJson(res, runOnPipeline(shared, [&, next] {
-            mode = next;
-            autoLearn = AutoLearn{};  // a half-finished prompt makes no sense in another mode
-            return Reply{200, R"({"mode":")" + mode + "\"}"};
-        }));
+                     mode = next;
+                     autoLearn =
+                         AutoLearn{};  // a half-finished prompt makes no sense in another mode
+                     return Reply{200, R"({"mode":")" + mode + "\"}"};
+                 }));
     });
 
     http.Post("/api/autolearn/label", [&](const httplib::Request& req, httplib::Response& res) {
@@ -329,17 +336,17 @@ int main(int argc, char** argv) {
             return;
         }
         sendJson(res, runOnPipeline(shared, [&, name] {
-            if (!autoLearn.startCollecting(name))
-                return Reply{409, jsonError("no unknown object is waiting for a label")};
-            return Reply{200, R"({"collecting":")" + name + "\"}"};
-        }));
+                     if (!autoLearn.startCollecting(name))
+                         return Reply{409, jsonError("no unknown object is waiting for a label")};
+                     return Reply{200, R"({"collecting":")" + name + "\"}"};
+                 }));
     });
 
     http.Post("/api/autolearn/dismiss", [&](const httplib::Request&, httplib::Response& res) {
         sendJson(res, runOnPipeline(shared, [&] {
-            autoLearn.dismiss();
-            return Reply{200, "{}"};
-        }));
+                     autoLearn.dismiss();
+                     return Reply{200, "{}"};
+                 }));
     });
 
     http.Get("/api/eval", [&](const httplib::Request&, httplib::Response& res) {
@@ -349,21 +356,22 @@ int main(int argc, char** argv) {
     // The task's evaluation hook: the user states the true label, the system tallies its guess.
     http.Post("/api/eval/record", [&](const httplib::Request&, httplib::Response& res) {
         sendJson(res, runOnPipeline(shared, [&] {
-            if (label.empty()) return Reply{409, jsonError("set the true label first")};
-            if (currentPrediction.empty()) return Reply{409, jsonError("no object detected")};
-            liveMatrix.add(label, currentPrediction);
-            fs::create_directories("out/eval");
-            std::ofstream("out/eval/live_confusion.md") << liveMatrix.toMarkdown();
-            std::ofstream("out/eval/live_confusion.csv") << liveMatrix.toCsv();
-            return Reply{200, matrixJson()};
-        }));
+                     if (label.empty()) return Reply{409, jsonError("set the true label first")};
+                     if (currentPrediction.empty())
+                         return Reply{409, jsonError("no object detected")};
+                     liveMatrix.add(label, currentPrediction);
+                     fs::create_directories("out/eval");
+                     std::ofstream("out/eval/live_confusion.md") << liveMatrix.toMarkdown();
+                     std::ofstream("out/eval/live_confusion.csv") << liveMatrix.toCsv();
+                     return Reply{200, matrixJson()};
+                 }));
     });
 
     http.Delete("/api/eval", [&](const httplib::Request&, httplib::Response& res) {
         sendJson(res, runOnPipeline(shared, [&] {
-            liveMatrix = orec::ConfusionMatrix{};
-            return Reply{200, matrixJson()};
-        }));
+                     liveMatrix = orec::ConfusionMatrix{};
+                     return Reply{200, matrixJson()};
+                 }));
     });
 
     // Loopback only: the API can write files and delete DB rows, so it must not face the LAN.
@@ -373,8 +381,8 @@ int main(int argc, char** argv) {
             shared.running = false;
         }
     });
-    std::cout << "serving on http://127.0.0.1:" << port << "  (source: " << spec << ", db: "
-              << db.size() << " samples)" << std::endl;
+    std::cout << "serving on http://127.0.0.1:" << port << "  (source: " << spec
+              << ", db: " << db.size() << " samples)" << std::endl;
 
     const std::vector<int> jpegParams = {cv::IMWRITE_JPEG_QUALITY, 80};
     double fps = 0.0;
@@ -452,8 +460,8 @@ int main(int argc, char** argv) {
             else if (autoLearn.state() == AutoLearn::State::Prompt)
                 text = "unknown: name me";
             else if (autoLearn.state() == AutoLearn::State::Collecting)
-                text = cv::format("%s %d/%d: %s", autoLearn.label().c_str(),
-                                  autoLearn.collected(), autoLearn.targetSamples(),
+                text = cv::format("%s %d/%d: %s", autoLearn.label().c_str(), autoLearn.collected(),
+                                  autoLearn.targetSamples(),
                                   autoLearn.awaitingMove() ? "move or rotate" : "hold still");
             drawFeatures(display, result.features, text);
         } else {

@@ -13,7 +13,8 @@ const std::vector<cv::Vec3b>& palette() {
         std::vector<cv::Vec3b> p(256);
         p[0] = {0, 0, 0};
         for (size_t i = 1; i < p.size(); ++i)
-            p[i] = {static_cast<uchar>(rng.uniform(60, 256)), static_cast<uchar>(rng.uniform(60, 256)),
+            p[i] = {static_cast<uchar>(rng.uniform(60, 256)),
+                    static_cast<uchar>(rng.uniform(60, 256)),
                     static_cast<uchar>(rng.uniform(60, 256))};
         return p;
     }();
@@ -40,8 +41,7 @@ void drawFeatures(cv::Mat& img, const objectrecognition::RegionFeatures& f,
         cv::line(img, corners[i], corners[(i + 1) % 4], {0, 255, 0}, 2, cv::LINE_AA);
 
     const cv::Point2d u(std::cos(f.theta), std::sin(f.theta));
-    cv::line(img, f.centroid + f.minE1 * u, f.centroid + f.maxE1 * u, {255, 0, 0}, 2,
-             cv::LINE_AA);
+    cv::line(img, f.centroid + f.minE1 * u, f.centroid + f.maxE1 * u, {255, 0, 0}, 2, cv::LINE_AA);
     cv::circle(img, f.centroid, 4, {0, 0, 255}, cv::FILLED);
     cv::putText(img, text, f.centroid + cv::Point2d(10, -10), cv::FONT_HERSHEY_SIMPLEX, 0.7,
                 {0, 0, 255}, 2);

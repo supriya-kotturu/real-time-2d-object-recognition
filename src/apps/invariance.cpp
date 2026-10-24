@@ -83,9 +83,9 @@ cv::Mat plot(const std::vector<Series>& series, const std::string& xName, double
         const double x1 = series.empty() ? 1 : series[0].params.back();
         const auto toPx = [&](double x, double y) {
             const double cy = std::clamp(y, yMin, yMax);
-            return cv::Point(margin + static_cast<int>((x - x0) / (x1 - x0) * (w - 2 * margin)),
-                             h - margin -
-                                 static_cast<int>((cy - yMin) / (yMax - yMin) * (h - 2 * margin)));
+            return cv::Point(
+                margin + static_cast<int>((x - x0) / (x1 - x0) * (w - 2 * margin)),
+                h - margin - static_cast<int>((cy - yMin) / (yMax - yMin) * (h - 2 * margin)));
         };
         cv::rectangle(p, {margin, margin}, {w - margin, h - margin}, cv::Scalar::all(200));
         cv::line(p, toPx(x0, 1.0), toPx(x1, 1.0), cv::Scalar::all(150), 1, cv::LINE_AA);
@@ -156,8 +156,8 @@ int main(int argc, char** argv) {
         const cv::Point2f center(object.cols / 2.0f, object.rows / 2.0f);
         for (double a : kAngles) {
             const cv::Mat m = cv::getRotationMatrix2D(center, a, 1.0);
-            cv::warpAffine(object, variant, m, object.size(), cv::INTER_LINEAR,
-                           cv::BORDER_CONSTANT, cv::Scalar::all(255));
+            cv::warpAffine(object, variant, m, object.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT,
+                           cv::Scalar::all(255));
             if (!featuresOf(variant, r, f)) continue;
             rot.params.push_back(a);
             rot.features.push_back(f);
@@ -188,8 +188,8 @@ int main(int argc, char** argv) {
     // Mean relative spread over images, per feature: lower = more invariant.
     std::ofstream summary(out / "summary.csv");
     summary << "feature,rotation_drift_pct,scale_drift_pct\n";
-    std::cout << "\nfeature drift (stdev/|mean| across variants, averaged over "
-              << rotations.size() << " images)\n\n| feature | rotation | scale |\n|---|---|---|\n";
+    std::cout << "\nfeature drift (stdev/|mean| across variants, averaged over " << rotations.size()
+              << " images)\n\n| feature | rotation | scale |\n|---|---|---|\n";
     for (size_t f = 0; f < orec::kFeatureNames.size(); ++f) {
         double rotDrift = 0, sclDrift = 0;
         for (const auto& s : rotations) rotDrift += relativeSpread(s.features, f);
@@ -203,6 +203,7 @@ int main(int argc, char** argv) {
 
     cv::imwrite((out / "rotation.png").string(), plot(rotations, "angle (deg)", 0.0));
     cv::imwrite((out / "scale.png").string(), plot(scales, "scale", 1.0));
-    std::cout << "\nwrote " << out.string() << "/{samples.csv,summary.csv,rotation.png,scale.png}\n";
+    std::cout << "\nwrote " << out.string()
+              << "/{samples.csv,summary.csv,rotation.png,scale.png}\n";
     return 0;
 }

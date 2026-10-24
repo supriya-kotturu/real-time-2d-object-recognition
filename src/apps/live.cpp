@@ -66,15 +66,15 @@ int main(int argc, char** argv) {
             objectText = "fill=" + cv::format("%.2f", result.features.values[0]);
             // Stdev over a single sample is 0 for every feature, so wait for two.
             if (db.size() >= 2) {
-                const auto match = orec::classifyNearest(db, stdevs, result.features.values,
-                                                         kUnknownThreshold);
+                const auto match =
+                    orec::classifyNearest(db, stdevs, result.features.values, kUnknownThreshold);
                 objectText = (match.known ? match.label : "unknown (" + match.label + "?)") +
                              cv::format(" d=%.2f", match.distance);
             }
             drawFeatures(display, result.features, objectText);
         }
-        const std::string status = "t=" + std::to_string(result.threshold) + "  label=" +
-                                   (label.empty() ? "<none: press n>" : label) +
+        const std::string status = "t=" + std::to_string(result.threshold) +
+                                   "  label=" + (label.empty() ? "<none: press n>" : label) +
                                    "  db=" + std::to_string(db.size());
         cv::putText(display, status, {10, 30}, cv::FONT_HERSHEY_SIMPLEX, 0.7, {0, 0, 255}, 2);
 

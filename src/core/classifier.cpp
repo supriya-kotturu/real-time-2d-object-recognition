@@ -15,7 +15,8 @@ std::vector<double> featureStdevs(const std::vector<Sample>& db) {
         for (size_t i = 0; i < k; ++i) mean[i] += s.features[i];
     for (auto& m : mean) m /= static_cast<double>(db.size());
     for (const auto& s : db)
-        for (size_t i = 0; i < k; ++i) var[i] += (s.features[i] - mean[i]) * (s.features[i] - mean[i]);
+        for (size_t i = 0; i < k; ++i)
+            var[i] += (s.features[i] - mean[i]) * (s.features[i] - mean[i]);
 
     // Floor at 1% of the feature's magnitude. A near-zero stdev (one class, or identical
     // samples) must not be skipped: skipping every feature makes every distance 0, so any

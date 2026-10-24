@@ -11,9 +11,8 @@ namespace fs = std::filesystem;
 
 FrameSource::FrameSource(const std::string& spec) {
     const bool isCameraIndex =
-        !spec.empty() && std::all_of(spec.begin(), spec.end(), [](unsigned char c) {
-            return std::isdigit(c);
-        });
+        !spec.empty() &&
+        std::all_of(spec.begin(), spec.end(), [](unsigned char c) { return std::isdigit(c); });
 
     if (isCameraIndex) {
         cap_.open(std::stoi(spec));

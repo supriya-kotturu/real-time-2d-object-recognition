@@ -99,13 +99,13 @@ int main(int argc, char** argv) {
         expect(d < 0.05, cv::format("same object at 0 and 135 deg: cosine distance %.4f", d));
 
         cv::Mat blank(reference.size(), reference.type(), cv::Scalar::all(240));
-        cv::circle(blank, {blank.cols / 2, blank.rows / 2}, blank.rows / 3,
-                   cv::Scalar(40, 30, 30), cv::FILLED);
+        cv::circle(blank, {blank.cols / 2, blank.rows / 2}, blank.rows / 3, cv::Scalar(40, 30, 30),
+                   cv::FILLED);
         std::vector<double> e2;
         embedder.embed(blank, e2);
         const double other = orec::cosineDistance(e0, e2);
-        expect(other > d, cv::format("a disc is farther from the hammer (%.4f) than its rotation",
-                                     other));
+        expect(other > d,
+               cv::format("a disc is farther from the hammer (%.4f) than its rotation", other));
     }
 
     std::cout << "\n" << failures << " failed\n";

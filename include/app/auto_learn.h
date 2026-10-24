@@ -23,7 +23,7 @@ class AutoLearn {
         double minRotateDegrees = 20.0;  // ... or rotated this much
         double stillFraction = 0.01;     // "held still" = moving less than this ...
         double stillRotateDegrees = 3.0;
-        double stillSeconds = 0.6;       // ... for this long
+        double stillSeconds = 0.6;  // ... for this long
     };
 
     AutoLearn() = default;

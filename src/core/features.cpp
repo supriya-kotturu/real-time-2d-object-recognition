@@ -71,12 +71,9 @@ bool computeFeatures(const cv::Mat& regionMap, int regionId, const cv::Rect& bbo
     const double aspectRatio = std::min(len1, len2) / std::max(len1, len2);
 
     // Normalised central moments: dividing by m00^(1 + (p+q)/2) removes scale.
-    const auto eta = [m00](double mu, int order) {
-        return mu / std::pow(m00, 1.0 + order / 2.0);
-    };
+    const auto eta = [m00](double mu, int order) { return mu / std::pow(m00, 1.0 + order / 2.0); };
     const double n20 = eta(mu20, 2), n02 = eta(mu02, 2), n11 = eta(mu11, 2);
-    const double n30 = eta(mu30, 3), n03 = eta(mu03, 3), n21 = eta(mu21, 3),
-                 n12 = eta(mu12, 3);
+    const double n30 = eta(mu30, 3), n03 = eta(mu03, 3), n21 = eta(mu21, 3), n12 = eta(mu12, 3);
     const double hu1 = n20 + n02;
     const double hu2 = (n20 - n02) * (n20 - n02) + 4.0 * n11 * n11;
     const double hu3 =

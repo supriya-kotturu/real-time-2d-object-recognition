@@ -128,10 +128,14 @@ double AutoLearn::holdProgress(Clock::time_point now) const {
 
 const char* toString(AutoLearn::State state) {
     switch (state) {
-        case AutoLearn::State::Idle: return "idle";
-        case AutoLearn::State::Tracking: return "tracking";
-        case AutoLearn::State::Prompt: return "prompt";
-        case AutoLearn::State::Collecting: return "collecting";
+        case AutoLearn::State::Idle:
+            return "idle";
+        case AutoLearn::State::Tracking:
+            return "tracking";
+        case AutoLearn::State::Prompt:
+            return "prompt";
+        case AutoLearn::State::Collecting:
+            return "collecting";
     }
     return "idle";
 }
