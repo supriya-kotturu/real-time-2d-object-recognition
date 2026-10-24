@@ -14,7 +14,7 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 | D-04 | 2026-10-23 | Repo / CMake layout | AGENT (you architect) | decided |
 | D-06 | 2026-10-23 | Capture storage + labelling | AGENT (you architect) | decided |
 | D-07 | 2026-10-23 | Camera source | — | decided: IP Webcam over Wi-Fi, working |
-| D-08 | 2026-10-23 | Grassfire border policy + distance type | HAND | decided |
+| D-08 | 2026-10-23 | Grassfire border policy + distance type | HAND | revised 2026-10-24 (shrink: border = far) |
 | D-09 | 2026-10-24 | T3 via OpenCV; time reinvested in extensions | SNIPPET | decided |
 | D-10 | 2026-10-24 | Extension set | mixed | decided (metric open) |
 | D-11 | 2026-10-24 | AI-first build: you hand-code T1 (done) + T2; agent builds the rest; you pass a review per part | mixed | decided |
@@ -273,3 +273,10 @@ Working: IP Webcam (Android) → `./out/live.exe "http://USER:PASS@<ip>:8080/vid
 
 **Root cause:** pressing `n` then typing in the terminal didn't work. OpenCV only sees keys while its window has focus, and the zsh terminal didn't hand `std::getline` input to the native .exe reliably.
 **Fix (better than option a):** the label is typed into the video window itself: `n` → type → Enter (Esc cancels, Backspace edits). The video keeps running, and confirmations show on screen as well as in the terminal. `s` now also saves the cleaned stage.
+
+### D-08 revisited (2026-10-24 afternoon)
+
+**Evidence:** a mouse capture cut off by the frame still produced features. Cause: with border = bg, the closing's shrink(2) followed by the opening's grow(1) left every object 1 px off the image edge, so T3's border-touching filter never fired.
+**Your decision:** in shrink, outside-the-image counts as **far** (the same as grow; matches `cv::erode`). Objects touching the edge stay touching. `grassfire()` itself still reports the border-as-bg distance.
+**Guard:** regression test "shrink 1 keeps an edge-touching object touching the edge"; mutation-checked (fails with the old policy).
+**Data:** you deleted the cut-off capture `mouse/20261024-153855-956.png`.

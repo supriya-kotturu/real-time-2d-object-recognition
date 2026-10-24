@@ -83,7 +83,10 @@ void grow(const cv::Mat& frame, cv::Mat& dest, Connectivity conn, int n) {
 
 void shrink(const cv::Mat& frame, cv::Mat& dest, Connectivity conn, int n) {
     cv::Mat dist;
-    grassfire(frame, dist, conn);
+    // Outside the image counts as far, not as background (D-08 revisited): with border = bg,
+    // shrinking peeled every object off the image edge, so T3's "touches the border" filter
+    // never fired and objects cut off by the frame were classified. Matches cv::erode.
+    distanceTransform(frame, dist, conn, frame.rows + frame.cols);
 
     // if the value is <= n, mark it as bg
     dest.create(frame.size(), CV_8UC1);

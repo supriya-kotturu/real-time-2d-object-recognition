@@ -147,6 +147,22 @@ void gridTests() {
               {0, 0, 0, 0, 0},
           });
 
+    // Regression (D-08 revisited): a band touching the left edge must still touch it after a
+    // shrink, or T3's border filter can't see objects cut off by the frame.
+    out.release();
+    const Grid edgeBand = {
+        {1, 1, 1, 0, 0}, {1, 1, 1, 0, 0}, {1, 1, 1, 0, 0}, {1, 1, 1, 0, 0}, {1, 1, 1, 0, 0},
+    };
+    orec::shrink(toBinary(edgeBand), out, Connectivity::Four, 1);
+    check("shrink 1 keeps an edge-touching object touching the edge", out,
+          {
+              {1, 1, 0, 0, 0},
+              {1, 1, 0, 0, 0},
+              {1, 1, 0, 0, 0},
+              {1, 1, 0, 0, 0},
+              {1, 1, 0, 0, 0},
+          });
+
     out.release();
     orec::grow(toBinary(kDot5), out, Connectivity::Four, 1);
     check("grow 1, 4-conn: single pixel", out, {});  // TODO
