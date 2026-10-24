@@ -70,6 +70,7 @@ add_objrec_executable(live src/apps/live.cpp)
 add_objrec_executable(inspect src/apps/inspect.cpp)
 add_objrec_executable(train src/apps/train.cpp)
 add_objrec_executable(eval src/apps/eval.cpp)
+add_objrec_executable(invariance src/apps/invariance.cpp)  # extension
 add_objrec_executable(tests tests/morphology_tests.cpp)  # D-05
 
 # Web GUI backend (D-13). cpp-httplib v0.60.1 is vendored header-only; SYSTEM keeps its
