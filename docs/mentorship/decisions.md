@@ -20,7 +20,9 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 | D-11 | 2026-10-24 | AI-first build: you hand-code T1 (done) + T2; agent builds the rest; you pass a review per part | mixed | decided |
 | D-12 | 2026-10-24 | Feature DB format | AGENT | decided |
 | D-13 | 2026-10-24 | Web GUI architecture (localhost) | AGENT (you architect) | **proposed: review before merge** |
-| D-14 | 2026-10-24 | T7 evaluation protocol | AGENT | **proposed** |
+| D-14 | 2026-10-24 | T7 evaluation protocol | AGENT | decided: task protocol (b) |
+| D-15 | 2026-10-24 | GUI modes + auto-learn | AGENT (you architect) | decided |
+| D-16 | 2026-10-24 | YOLO vs ResNet18 for T9 | SNIPPET | decided: ResNet18 |
 | D-05 | 2026-10-23 | Headless tests + 4/8-conn visual dump for from-scratch stages | AGENT harness, HAND expected values | decided |
 
 ---
@@ -188,3 +190,30 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 **Why:** evaluating against a DB that contains the test image scores 100% by self-match (distance 0). Shown on the dev set: fixed DB 6/6 vs LOO 2/6.
 **Alternatives:** (b) `--db` = the interactively trained DB vs separately captured test images. Honest only if the test images were never trained on. (c) a fixed train/test split per label: needs ≥ 2× the captures.
 **Your call:** which protocol goes in the report? LOO needs ≥ 2 images per label (≥ 3 recommended, per Task 7).
+
+### D-14 update (2026-10-24)
+
+**Decided: follow the task.** Train a DB, then evaluate on ≥ 3 *separate* images per object in new positions/orientations, using a true-label hook. → `eval data/test --db data/db/features.csv`; test captures go in `data/test/<label>/`. LOO stays as a supplementary number.
+
+## D-13 update — your WebRTC proposal
+
+You proposed: webcam → server over WebRTC media tracks; results back over an unreliable DataChannel (or drawn onto a return track).
+**Mentor objection:** that's the right transport *for server-side processing*, but it contradicts D-03, where you chose hybrid/client-side compute so that no frames leave the browser. Under hybrid there's no server to stream to, so WebRTC isn't needed at all. Under server-side, Netlify can't host it (static + short functions, no long-lived media sessions); you'd need a media server (libwebrtc/GStreamer/aiortc), TURN for NAT traversal (paid bandwidth), and one server-side decode + pipeline per user.
+**Open:** pick the deployment world first (client-side hybrid vs server-side processing); the transport follows from it. The localhost GUI stays MJPEG either way (loopback, single user).
+
+## D-15 — GUI modes + auto-learn (proposed)
+
+- **Detect:** live recognition. Auto-learn: an object that stays *unknown* (distance > cutoff in every frame) and *roughly stationary* (centroid drift small) for T seconds triggers a "name this object" prompt. On a label → auto-collect N samples over ~2 s into the DB ("collect statistics", per the extension text). "Not registered anywhere" = no DB entry within the cutoff for the whole window; a dismissed object isn't re-prompted until it leaves the frame.
+- **Collect:** set label → train / capture (current controls).
+- **Evaluate (suggested):** set the true label → "record" tallies a live confusion matrix (the task's "hook to tell the system if it's correct").
+- **Open:** T = 10 s (yours) vs ~3 s; N samples; Evaluate as a third mode?
+
+## D-16 — YOLO vs ResNet18 for T9 (open)
+
+See session: YOLO is a detector over fixed (COCO) classes, not a one-shot embedding; Task 9 requires an embedding + one-shot NN + a comparison vs the hand-built features. Ultralytics YOLO is AGPL-3.0.
+
+### Decisions 2026-10-24 (morning)
+
+- **D-03/D-13:** the public (Netlify) version processes **in the browser** (hybrid, client compute). No WebRTC: frames never leave the browser. The localhost GUI keeps MJPEG.
+- **D-15:** three modes: **Detect** (auto-learn after **3 s** unknown + stationary), **Collect**, **Evaluate** (live confusion matrix via a true-label hook).
+- **D-16:** ResNet18 one-shot embedding for T9. YOLO rejected: per-class retraining cost, no one-shot, no Netlify compute budget, AGPL. Still open: instructor's ONNX (Canvas) vs a public ONNX-zoo ResNet18.

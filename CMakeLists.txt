@@ -45,6 +45,7 @@ add_library(objrec_app STATIC
 	src/app/feature_db.cpp
 	src/app/capture.cpp
 	src/app/dataset.cpp
+	src/app/auto_learn.cpp
 )
 target_include_directories(objrec_app PUBLIC "${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(objrec_app PUBLIC objrec_core ${OpenCV_LIBS})
@@ -72,6 +73,7 @@ add_objrec_executable(train src/apps/train.cpp)
 add_objrec_executable(eval src/apps/eval.cpp)
 add_objrec_executable(invariance src/apps/invariance.cpp)  # extension
 add_objrec_executable(tests tests/morphology_tests.cpp)  # D-05
+add_objrec_executable(autolearn_tests tests/auto_learn_tests.cpp)  # D-15
 
 # Web GUI backend (D-13). cpp-httplib v0.60.1 is vendored header-only; SYSTEM keeps its
 # warnings out of our /W4 output.
