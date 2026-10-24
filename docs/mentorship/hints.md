@@ -44,3 +44,4 @@ Each hint gets an ID. If the same hint is needed again → −1 on the scoreboar
 | H-38 | 2026-10-23 | Project style | One project namespace, `objectrecognition`, for every core file. Callers write `orec::grassfire`, not a different namespace per file. | 1 |
 | H-39 | 2026-10-23 | C++ syntax | Every C++ function needs an explicit return type (`void` if it returns nothing). TS infers one; C++ errors with C4430 "missing type specifier". | 0 |
 | H-40 | 2026-10-23 | C++ const | Inputs get `const cv::Mat&`, outputs get plain `cv::Mat&`; a const output can't be `create()`d or written. Top-level `const` on by-value params (`const Connectivity conn`) means nothing in a declaration. | 0 |
+| H-41 | 2026-10-24 | OpenCV 5 | 4.x → 5.0 moved `getRotationMatrix2D`, `boundingRect` (and other 2-D geometry) from imgproc to `<opencv2/geometry.hpp>`. Expect the same when porting the instructor's T9 code. | 0 |

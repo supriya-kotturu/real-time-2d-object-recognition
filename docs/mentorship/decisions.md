@@ -20,6 +20,7 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 | D-11 | 2026-10-24 | AI-first build: you hand-code T1 (done) + T2; agent builds the rest; you pass a review per part | mixed | decided |
 | D-12 | 2026-10-24 | Feature DB format | AGENT | decided |
 | D-13 | 2026-10-24 | Web GUI architecture (localhost) | AGENT (you architect) | **proposed: review before merge** |
+| D-14 | 2026-10-24 | T7 evaluation protocol | AGENT | **proposed** |
 | D-05 | 2026-10-23 | Headless tests + 4/8-conn visual dump for from-scratch stages | AGENT harness, HAND expected values | decided |
 
 ---
@@ -149,6 +150,17 @@ Status: `open` → `decided` → (`superseded by D-xx`).
   - `live` keys: `t` = train; `inspect` = headless report images + `out/stages/features.csv`.
   - Verified on the dev set: OBB and axis align on img4P3; cardboard is excluded as a border region; img1p3 (yellow) finds no object, as predicted from grayscale ≈ 227.
   - **Pending your review checks.**
+- **2026-10-24 overnight (agent), branch `stack/objrec`**, oldest → newest. Review one commit at a time:
+  1. `9b6c2b4` core: regions / features / classifier (T3–T6)
+  2. `0ccdd07` app: live + inspect wiring
+  3. `f1bfbad` docs: D-09..D-12
+  4. `dd8af2f` refactor: shared capture helpers + label validation
+  5. `7204d1c` server.exe: MJPEG + JSON API (D-13, proposed)
+  6. `5ea4c25` web scaffold (generated; skim only)
+  7. `fb36a7d` web dashboard (D-13, proposed)
+  8. `421e915` train + eval, leave-one-out (D-14, proposed)
+  9. `013af69` invariance extension
+  - Not merged to main. Your WIP `src/core/morphology.cpp` is untouched and uncommitted; an older copy sits in `stash@{0}`.
 
 ## D-13 — Web GUI architecture (localhost)
 
@@ -168,3 +180,11 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 **Security:** binds 127.0.0.1 only (the API writes files and deletes DB rows). Labels are validated as `[A-Za-z0-9_-]{1,64}` (blocks `../` traversal). httplib is pinned past every published GHSA (latest fix: 0.51.0).
 **Verified:** curl smoke test on the dev set: status, label validation, next, settings, db, a 2 s stream (~224 KB), bad view → 400.
 **Questions for you:** (1) MJPEG vs WebSocket: agree? (2) Is 250 ms polling acceptable? (3) Should the GUI also expose auto-learn (extension 1) once it's built?
+
+## D-14 — T7 evaluation protocol
+
+**Status:** PROPOSED (built overnight).
+**Default:** leave-one-out over `data/objects/<label>/`. Each image is classified against all the *other* images.
+**Why:** evaluating against a DB that contains the test image scores 100% by self-match (distance 0). Shown on the dev set: fixed DB 6/6 vs LOO 2/6.
+**Alternatives:** (b) `--db` = the interactively trained DB vs separately captured test images. Honest only if the test images were never trained on. (c) a fixed train/test split per label: needs ≥ 2× the captures.
+**Your call:** which protocol goes in the report? LOO needs ≥ 2 images per label (≥ 3 recommended, per Task 7).
