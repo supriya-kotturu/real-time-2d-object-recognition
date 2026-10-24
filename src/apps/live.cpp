@@ -1,12 +1,14 @@
 // Live viewer: tasks 1-6 on a camera, video, or image directory.
 // Usage: live [camera-index | video-file | stream-url | image-dir]   (default: camera 0)
 // Keys: q/Esc quit
-//       n     set the current object label (typed in the terminal; video pauses meanwhile)
+//       n     type a new label straight into the video window; Enter = set, Esc = cancel
 //       t     train: append the primary region's features + label to the feature DB (T5)
 //       s     save raw frame -> data/objects/<label>/<timestamp>.png
 //             and each stage -> out/stages/<stage>/<label>/<timestamp>.png   (D-06)
 //       any other key -> next still image
 
+#include <cctype>
+#include <chrono>
 #include <filesystem>
 #include <iostream>
 #include <opencv2/core/utils/logger.hpp>
@@ -30,6 +32,10 @@ const std::string kDbPath = "data/db/features.csv";
 // Placeholder until it's tuned on real captures (GUI slider later).
 constexpr double kUnknownThreshold = 3.0;
 
+// The terminal isn't a reliable input under every shell, and switching focus away from the
+// video is clumsy, so the label is typed into the window itself (D-06 fallback).
+bool isLabelChar(int k) { return std::isalnum(k) || k == '_' || k == '-'; }
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -46,6 +52,16 @@ int main(int argc, char** argv) {
     const fs::path rawRoot = "data/objects";
     const fs::path stageRoot = "out/stages";
     std::string label;
+    bool editing = false;
+    std::string draft;
+    // Confirmations show in the window too: the terminal may be hidden behind it.
+    std::string notice;
+    auto noticeUntil = std::chrono::steady_clock::now();
+    const auto notify = [&](const std::string& msg) {
+        notice = msg;
+        noticeUntil = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        std::cout << msg << "\n";
+    };
 
     std::vector<orec::Sample> db = loadFeatureDb(kDbPath);
     std::vector<double> stdevs = orec::featureStdevs(db);
@@ -73,49 +89,69 @@ int main(int argc, char** argv) {
             }
             drawFeatures(display, result.features, objectText);
         }
-        const std::string status = "t=" + std::to_string(result.threshold) +
-                                   "  label=" + (label.empty() ? "<none: press n>" : label) +
+        const std::string labelText =
+            editing ? "type label: " + draft + "_  (Enter/Esc)"
+                    : "label=" + (label.empty() ? std::string("<none: press n>") : label);
+        const std::string status = "t=" + std::to_string(result.threshold) + "  " + labelText +
                                    "  db=" + std::to_string(db.size());
         cv::putText(display, status, {10, 30}, cv::FONT_HERSHEY_SIMPLEX, 0.7, {0, 0, 255}, 2);
+        if (std::chrono::steady_clock::now() < noticeUntil)
+            cv::putText(display, notice, {10, 60}, cv::FONT_HERSHEY_SIMPLEX, 0.7, {0, 160, 0}, 2);
 
         cv::imshow("original", display);
         cv::imshow("threshold", result.binary);
         cv::imshow("regions", regionsVis);
 
-        const int key = cv::waitKey(source.isStill() ? 0 : 1);
+        const int raw = cv::waitKey(source.isStill() ? 0 : 1);
+        const int key = raw < 0 ? -1 : raw & 0xFF;
+
+        if (editing) {
+            if (key == 13 || key == 10) {
+                if (isValidLabel(draft)) {
+                    label = draft;
+                    notify("label set: " + label);
+                } else {
+                    notify("labels: 1-64 letters, digits, _ or -");
+                }
+                editing = false;
+            } else if (key == 27) {
+                editing = false;
+            } else if (key == 8 && !draft.empty()) {
+                draft.pop_back();
+            } else if (key >= 0 && isLabelChar(key) && draft.size() < 64) {
+                draft += static_cast<char>(key);
+            }
+            continue;
+        }
+
         if (key == 'q' || key == 27) break;
         if (key == 'n') {
-            // D-06 option (b): blocks the video loop while typing. If that proves unusable,
-            // record why in decisions.md and fall back to a --label CLI arg (option a).
-            std::cout << "label (click this terminal, type, Enter): " << std::flush;
-            std::getline(std::cin, label);
-            if (!isValidLabel(label)) {
-                std::cout << "labels may only use letters, digits, _ and -\n";
-                label.clear();
-            }
+            editing = true;
+            draft.clear();
         }
         if (key == 't') {
             if (label.empty() || !result.hasFeatures) {
-                std::cout << "need a label (n) and a detected object to train\n";
+                notify("need a label (n) and a detected object to train");
                 continue;
             }
             const orec::Sample sample{label, result.features.values};
             appendSample(kDbPath, sample);
             db.push_back(sample);
             stdevs = orec::featureStdevs(db);
-            std::cout << "trained '" << label << "' (" << db.size() << " samples)\n";
+            notify("trained '" + label + "' (" + std::to_string(db.size()) + " samples)");
         }
         if (key == 's') {
             if (label.empty()) {
-                std::cout << "no label set: press n first\n";
+                notify("no label set: press n first");
                 continue;
             }
             const std::string file = timestamp() + ".png";
             saveImage(rawRoot / label, file, frame);
             saveImage(stageRoot / "threshold" / label, file, result.binary);
+            saveImage(stageRoot / "cleaned" / label, file, result.cleaned);
             saveImage(stageRoot / "regions" / label, file, regionsVis);
             saveImage(stageRoot / "features" / label, file, display);
-            std::cout << "saved " << (rawRoot / label / file).string() << "\n";
+            notify("saved " + (rawRoot / label / file).string());
         }
     }
     return 0;

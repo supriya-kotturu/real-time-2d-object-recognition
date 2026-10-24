@@ -13,7 +13,7 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 | D-03 | 2026-10-23 | Browser camera → inference → overlay | AGENT (you architect) | deferred (gated by D-01) |
 | D-04 | 2026-10-23 | Repo / CMake layout | AGENT (you architect) | decided |
 | D-06 | 2026-10-23 | Capture storage + labelling | AGENT (you architect) | decided |
-| D-07 | 2026-10-23 | Camera source | — | proposed (test Sat AM) |
+| D-07 | 2026-10-23 | Camera source | — | decided: IP Webcam over Wi-Fi, working |
 | D-08 | 2026-10-23 | Grassfire border policy + distance type | HAND | decided |
 | D-09 | 2026-10-24 | T3 via OpenCV; time reinvested in extensions | SNIPPET | decided |
 | D-10 | 2026-10-24 | Extension set | mixed | decided (metric open) |
@@ -264,3 +264,12 @@ Hand-computing the 6 TODO grids is skipped for time. The two hand-checked cases 
 
 Wired: closing (grow, shrink) then opening (shrink, grow), 8-conn, close n=2, open n=1.
 Evidence: img4P3's blade glare gap (~6–8 px) narrows but doesn't seal at n=2 (it needs n ≥ ~4). Options: raise n (merges nearby parts, rounds corners), accept the gap, or decide on your own captures. Your report's T2 reasoning paragraph = this decision.
+
+### D-07 outcome (2026-10-24 afternoon)
+
+Working: IP Webcam (Android) → `./out/live.exe "http://USER:PASS@<ip>:8080/video"`. Pitfalls hit: `https` fails (the app serves http; its optional HTTPS uses a self-signed cert that FFmpeg rejects); auth enabled in the app → credentials go in the URL (URL-encode special characters). Report: real-time system (phone stream).
+
+### D-06 fallback triggered (2026-10-24 afternoon)
+
+**Root cause:** pressing `n` then typing in the terminal didn't work. OpenCV only sees keys while its window has focus, and the zsh terminal didn't hand `std::getline` input to the native .exe reliably.
+**Fix (better than option a):** the label is typed into the video window itself: `n` → type → Enter (Esc cancels, Backspace edits). The video keeps running, and confirmations show on screen as well as in the terminal. `s` now also saves the cleaned stage.
