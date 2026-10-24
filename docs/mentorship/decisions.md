@@ -27,6 +27,7 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 | D-18 | 2026-10-24 | T9 port of instructor utilities + model handling | AGENT | decided, built |
 | D-19 | 2026-10-24 | Model delivery for the Netlify (browser) version | AGENT (you architect) | decided: build-time fetch + cache (LFS question open) |
 | D-20 | 2026-10-24 | T2 grassfire body written by agent from your pseudocode | AGENT (your design) | decided; explain-it-back pending |
+| D-21 | 2026-10-24 | T2 cleanup parameters | you | proposed: close 2 / open 1, 8-conn |
 | D-05 | 2026-10-23 | Headless tests + 4/8-conn visual dump for from-scratch stages | AGENT harness, HAND expected values | decided |
 
 ---
@@ -258,3 +259,8 @@ The model isn't in git, so Netlify's build must get it some other way. Options a
 ### D-05 amendment (2026-10-24, 14:50)
 
 Hand-computing the 6 TODO grids is skipped for time. The two hand-checked cases (3×3 grassfire, shrink 1) pass, and the 4- vs 8-conn behaviour is verified visually in out/tests. The TODO cases stay in tests.exe as reported TODOs.
+
+## D-21 — T2 cleanup parameters (proposed)
+
+Wired: closing (grow, shrink) then opening (shrink, grow), 8-conn, close n=2, open n=1.
+Evidence: img4P3's blade glare gap (~6–8 px) narrows but doesn't seal at n=2 (it needs n ≥ ~4). Options: raise n (merges nearby parts, rounds corners), accept the gap, or decide on your own captures. Your report's T2 reasoning paragraph = this decision.
