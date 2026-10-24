@@ -32,6 +32,7 @@ add_library(objrec_core STATIC
 	src/core/regions.cpp
 	src/core/features.cpp
 	src/core/classifier.cpp
+	src/core/evaluation.cpp
 )
 target_include_directories(objrec_core PUBLIC "${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(objrec_core PUBLIC opencv_core opencv_imgproc)
@@ -43,6 +44,7 @@ add_library(objrec_app STATIC
 	src/app/overlay.cpp
 	src/app/feature_db.cpp
 	src/app/capture.cpp
+	src/app/dataset.cpp
 )
 target_include_directories(objrec_app PUBLIC "${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(objrec_app PUBLIC objrec_core ${OpenCV_LIBS})
@@ -66,6 +68,8 @@ endfunction()
 # D-04 option B: one lean executable per job.
 add_objrec_executable(live src/apps/live.cpp)
 add_objrec_executable(inspect src/apps/inspect.cpp)
+add_objrec_executable(train src/apps/train.cpp)
+add_objrec_executable(eval src/apps/eval.cpp)
 add_objrec_executable(tests tests/morphology_tests.cpp)  # D-05
 
 # Web GUI backend (D-13). cpp-httplib v0.60.1 is vendored header-only; SYSTEM keeps its
