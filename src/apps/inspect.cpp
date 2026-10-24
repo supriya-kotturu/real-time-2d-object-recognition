@@ -1,7 +1,7 @@
 // Headless batch run of tasks 1-4 over an image directory. Produces the report's required
 // images and feature vectors without clicking through windows.
 // Usage: inspect [image-dir]   (default: data/examples)
-// Writes out/stages/{threshold,regions,features,roi}/<stem>.png and out/stages/features.csv
+// Writes out/stages/{threshold,cleaned,regions,features,roi}/<stem>.png and out/stages/features.csv
 // (roi = Task 9 steps A-C: the original image rotated so the primary axis lies along x).
 
 #include <filesystem>
@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
     }
 
     const fs::path out = "out/stages";
-    for (const char* stage : {"threshold", "regions", "features", "roi"})
+    for (const char* stage : {"threshold", "cleaned", "regions", "features", "roi"})
         fs::create_directories(out / stage);
     std::ofstream csv(out / "features.csv");
     csv << "image";
@@ -48,6 +48,7 @@ int main(int argc, char** argv) {
         if (result.hasFeatures) drawFeatures(display, result.features, source.currentName());
 
         cv::imwrite((out / "threshold" / file).string(), result.binary);
+        cv::imwrite((out / "cleaned" / file).string(), result.cleaned);
         cv::imwrite((out / "regions" / file).string(), regionsVis);
         cv::imwrite((out / "features" / file).string(), display);
 
@@ -71,6 +72,6 @@ int main(int argc, char** argv) {
         std::cout << "\n";
     }
     std::cout << "wrote " << out.string()
-              << "/{threshold,regions,features,roi}/ and features.csv\n";
+              << "/{threshold,cleaned,regions,features,roi}/ and features.csv\n";
     return 0;
 }

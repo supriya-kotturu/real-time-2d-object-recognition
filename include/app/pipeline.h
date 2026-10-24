@@ -11,6 +11,7 @@
 struct FrameResult {
     int threshold = 0;
     cv::Mat gray, binary, cleaned, regionMap;
+    cv::Mat scratch;  // intermediate between the T2 grow/shrink steps
     std::vector<objectrecognition::Region> regions;
     int primary = -1;  // index into regions, -1 = no usable region
     objectrecognition::RegionFeatures features;
