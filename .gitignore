@@ -81,3 +81,6 @@ __MACOSX/
 
 # Build outputs (CMakePresets binaryDir + runtime output)
 out/
+
+# Model weights: download per data/models/README.md (D-18)
+data/models/*.onnx
