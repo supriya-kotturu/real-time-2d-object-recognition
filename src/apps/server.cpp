@@ -13,7 +13,7 @@
 //   PUT    /api/settings  {"unknownThreshold": 3.0}
 //   PUT    /api/mode      {"mode": "detect"|"collect"|"evaluate"}       (D-15)
 //   POST   /api/autolearn/label  {"label": "mug"}    name the prompted unknown object
-//   POST   /api/autolearn/dismiss                    ignore it until it leaves the frame
+//   POST   /api/autolearn/dismiss                    ignore it until it leaves / stop collecting
 //   GET    /api/eval                                 live confusion matrix
 //   POST   /api/eval/record                          tally current prediction vs true label
 //   DELETE /api/eval                                 reset the live matrix
@@ -329,7 +329,7 @@ int main(int argc, char** argv) {
             return;
         }
         sendJson(res, runOnPipeline(shared, [&, name] {
-            if (!autoLearn.startCollecting(name, AutoLearn::Clock::now()))
+            if (!autoLearn.startCollecting(name))
                 return Reply{409, jsonError("no unknown object is waiting for a label")};
             return Reply{200, R"({"collecting":")" + name + "\"}"};
         }));
@@ -410,11 +410,11 @@ int main(int argc, char** argv) {
 
         if (mode == "detect") {
             const double diagonal = std::hypot(frame.cols, frame.rows);
-            autoLearn.update(result.hasFeatures, unknown, result.features.centroid, diagonal,
-                             frameTime);
+            autoLearn.update(result.hasFeatures, unknown, result.features.centroid,
+                             result.features.theta, diagonal, frameTime);
             if (result.hasFeatures && autoLearn.wantsSample(frameTime)) {
-                addSample(autoLearn.label());
-                autoLearn.sampleTaken(frameTime);
+                addSample(autoLearn.label());  // before sampleTaken: the last pose clears it
+                autoLearn.sampleTaken(result.features.centroid, result.features.theta);
             }
         }
 
@@ -428,7 +428,8 @@ int main(int argc, char** argv) {
                << toString(autoLearn.state()) << R"(","progress":)"
                << cv::format("%.2f", autoLearn.holdProgress(frameTime)) << R"(,"label":")"
                << jsonEscape(autoLearn.label()) << R"(","collected":)" << autoLearn.collected()
-               << R"(,"target":)" << autoLearn.targetSamples() << R"(},"object":)";
+               << R"(,"target":)" << autoLearn.targetSamples() << R"(,"phase":")"
+               << (autoLearn.awaitingMove() ? "move" : "hold") << R"("},"object":)";
         if (result.hasFeatures) {
             status << R"({"features":{)";
             for (size_t i = 0; i < result.features.values.size(); ++i)
@@ -451,8 +452,9 @@ int main(int argc, char** argv) {
             else if (autoLearn.state() == AutoLearn::State::Prompt)
                 text = "unknown: name me";
             else if (autoLearn.state() == AutoLearn::State::Collecting)
-                text = cv::format("learning %s %d/%d", autoLearn.label().c_str(),
-                                  autoLearn.collected(), autoLearn.targetSamples());
+                text = cv::format("%s %d/%d: %s", autoLearn.label().c_str(),
+                                  autoLearn.collected(), autoLearn.targetSamples(),
+                                  autoLearn.awaitingMove() ? "move or rotate" : "hold still");
             drawFeatures(display, result.features, text);
         } else {
             status << "null";
