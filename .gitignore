@@ -75,3 +75,9 @@ out/linux/
 
 # Local Netlify folder
 .netlify
+# macOS zip junk
+__MACOSX/
+.DS_Store
+
+# Build outputs (CMakePresets binaryDir + runtime output)
+out/

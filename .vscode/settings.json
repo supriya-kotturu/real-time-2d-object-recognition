@@ -1,0 +1,5 @@
+{
+  // IntelliSense takes include paths (OpenCV, include/) from the CMake targets instead of guessing.
+  "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+  "cmake.useCMakePresets": "always"
+}
