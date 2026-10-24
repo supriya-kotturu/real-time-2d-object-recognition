@@ -7,7 +7,7 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 
 | ID | Date | Decision | Owner | Status |
 | --- | --- | --- | --- | --- |
-| D-00 | 2026-10-23 | Hand-code vs agent split | mixed | decided |
+| D-00 | 2026-10-23 | Hand-code vs agent split | mixed | superseded by D-11 |
 | D-01 | 2026-10-23 | Scope vs 2026-10-27 deadline | — | decided |
 | D-02 | 2026-10-23 | Embedding model (native C++) | SNIPPET | decided (pending confirm) |
 | D-03 | 2026-10-23 | Browser camera → inference → overlay | AGENT (you architect) | deferred (gated by D-01) |
@@ -17,6 +17,8 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 | D-08 | 2026-10-23 | Grassfire border policy + distance type | HAND | decided |
 | D-09 | 2026-10-24 | T3 via OpenCV; time reinvested in extensions | SNIPPET | decided |
 | D-10 | 2026-10-24 | Extension set | mixed | decided (metric open) |
+| D-11 | 2026-10-24 | AI-first build: you hand-code T1 (done) + T2; agent builds the rest; you pass a review per part | mixed | decided |
+| D-12 | 2026-10-24 | Feature DB format | AGENT | decided |
 | D-05 | 2026-10-23 | Headless tests + 4/8-conn visual dump for from-scratch stages | AGENT harness, HAND expected values | decided |
 
 ---
@@ -115,3 +117,34 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 5. **Open:** "embeddings with scaled Euclidean". Mentor objection: per-dim stdev over ~10 one-shot samples is noisy and blows up near-zero-variance dims. Alternatives: a metric comparison (scaled-Euclid vs cosine vs SSD), or a 2-D PCA plot.
 - **Web app:** after the deadline (D-01 gate, D-03 design).
 **Budget:** ~26h available (Sat ~10, Mon 15:00–24:00 ≈ 7, Tue ≈ 9 + 3h report buffer) vs ~25–27h needed. Zero slack, so the extensions are ordered by cost.
+
+## D-11 — AI-first build (supersedes D-00)
+
+**Status:** decided.
+**Context:** you want to maximise the grade. Extensions = the last 4 of 30 points. task.pdf is silent on AI.
+- **HAND:** T1 (done: ISODATA + applyThreshold) and T2 grassfire. This covers the from-scratch requirement and the ">1 from scratch" extension.
+- **AGENT:** T3–T7, T9, the GUI, and the extensions. You specify, then review, then pass a 2-minute explain-it-back check per part (Q&A = 2 pts).
+- **Attribution:** cite AI use in report §5 (Acknowledgements); the session transcript gets committed to the repo.
+- **Extensions (revises D-10):**
+  1. Auto-learning unknown objects (includes unknown detection).
+  2. Measured invariance: synthetic rotation/scale sweeps with a plot of each feature's drift.
+  3. Better GUI. You want it web-based → see D-03 for the options. The OpenCV panel stays as the guaranteed fallback.
+  4. >1 stage from scratch (T1 + T2).
+  5. +5 objects (from D-10). *Not re-listed in round 2: confirm.*
+
+## D-12 — Feature DB format
+
+**Status:** decided. Option (a): one headerless CSV, `label,f1,...,fk`, one row per sample.
+**Your reasoning:** nobody opens it by hand; if the features change, regenerate the DB (YAGNI).
+**Consequence:** the feature order is a code contract. If the features change, the DB must be retrained (stale rows → wrong distances). Embeddings get a separate file per model (H-01).
+
+### D-11 build log
+
+- **2026-10-24 ~01:00 (agent): T3–T6 built.**
+  - `core/regions` (OpenCV CC, min-area filter, largest-N, renumbering, central-and-off-border primary).
+  - `core/features` (3-pass moments → θ, oriented bbox from axis extents, 5 features: percentFilled, aspectRatio, hu1–hu3).
+  - `core/classifier` (per-feature stdev, scaled Euclidean, nearest neighbour + unknown cutoff).
+  - `app/feature_db` (D-12 CSV), `app/pipeline` (T1→T4, with a T2 slot), `app/overlay`.
+  - `live` keys: `t` = train; `inspect` = headless report images + `out/stages/features.csv`.
+  - Verified on the dev set: OBB and axis align on img4P3; cardboard is excluded as a border region; img1p3 (yellow) finds no object, as predicted from grayscale ≈ 227.
+  - **Pending your review checks.**

@@ -2,10 +2,11 @@
 
 Rules:
 - **+1** — a visible improvement (cleaner reasoning, a bug caught on your own, a better trade-off call, idiomatic C++ where before it wasn't).
+- From D-11 on, agent-built parts earn/lose points in review: each part gets an explain-it-back check.
 - **−1** — a hint already given (listed in `hints.md`) has to be given again.
 - Progress update every 6h of active work. Measured from the `Last update` timestamp below; checked at the start of every session.
 
-**Total: +6**
+**Total: +7**
 **Last update:** 2026-10-24 ~00:00 (checkpoint 1). Next one due after 6 more hours of work.
 
 ## Ledger
@@ -43,6 +44,7 @@ Rules:
 | 2026-10-23 | −1 | Namespace still `morphology` after being asked to keep `objectrecognition` (logged as H-38) | H-38 |
 | 2026-10-23 | +1 | morphology.h compiles: void return types, const inputs, project namespace, OpenCV-style param order | H-36, H-38, H-39 |
 | 2026-10-24 | +1 | Scoped by grading value: swapped from-scratch T3 for OpenCV to free time for extensions (base caps at 26/30) | D-09 |
+| 2026-10-24 | +1 | DB format: rejected the header row via YAGNI on your own ("no one opens it; change the code if needed") | H-17 |
 
 ## Progress updates
 
