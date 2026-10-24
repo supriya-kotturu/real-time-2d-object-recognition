@@ -51,4 +51,28 @@ Match classifyNearest(const std::vector<Sample>& db, const std::vector<double>& 
     return best;
 }
 
+double cosineDistance(const std::vector<double>& a, const std::vector<double>& b) {
+    double dot = 0, na = 0, nb = 0;
+    for (size_t i = 0; i < a.size(); ++i) {
+        dot += a[i] * b[i];
+        na += a[i] * a[i];
+        nb += b[i] * b[i];
+    }
+    if (na == 0 || nb == 0) return 1.0;  // a zero vector has no direction
+    return 1.0 - dot / (std::sqrt(na) * std::sqrt(nb));
+}
+
+Match classifyCosine(const std::vector<Sample>& db, const std::vector<double>& features,
+                     double unknownThreshold) {
+    if (db.empty()) throw std::invalid_argument("classifyCosine: empty DB");
+    Match best{"", std::numeric_limits<double>::max(), false};
+    for (const auto& s : db) {
+        if (s.features.size() != features.size()) continue;
+        const double d = cosineDistance(features, s.features);
+        if (d < best.distance) best = {s.label, d, false};
+    }
+    best.known = best.distance <= unknownThreshold;
+    return best;
+}
+
 }  // namespace objectrecognition
