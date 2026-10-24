@@ -39,9 +39,12 @@ target_link_libraries(objrec_core PUBLIC opencv_core opencv_imgproc)
 # --- objrec_app: glue shared by executables (input sources, windows, CSV) ---
 add_library(objrec_app STATIC
 	src/app/frame_source.cpp
+	src/app/pipeline.cpp
+	src/app/overlay.cpp
+	src/app/feature_db.cpp
 )
 target_include_directories(objrec_app PUBLIC "${PROJECT_SOURCE_DIR}/include")
-target_link_libraries(objrec_app PUBLIC ${OpenCV_LIBS})
+target_link_libraries(objrec_app PUBLIC objrec_core ${OpenCV_LIBS})
 
 if(WIN32)
 	file(GLOB OPENCV_RUNTIME_DLLS "${OpenCV_DIR}/x64/*/bin/*.dll" "${OpenCV_DIR}/bin/*.dll")
@@ -61,4 +64,5 @@ endfunction()
 
 # D-04 option B: one lean executable per job.
 add_objrec_executable(live src/apps/live.cpp)
+add_objrec_executable(inspect src/apps/inspect.cpp)
 add_objrec_executable(tests tests/morphology_tests.cpp)  # D-05
