@@ -11,6 +11,12 @@
 //   POST   /api/capture                                save raw + stage images (D-06)
 //   POST   /api/next                                   advance to the next still image
 //   PUT    /api/settings  {"unknownThreshold": 3.0}
+//   PUT    /api/mode      {"mode": "detect"|"collect"|"evaluate"}       (D-15)
+//   POST   /api/autolearn/label  {"label": "mug"}    name the prompted unknown object
+//   POST   /api/autolearn/dismiss                    ignore it until it leaves the frame
+//   GET    /api/eval                                 live confusion matrix
+//   POST   /api/eval/record                          tally current prediction vs true label
+//   DELETE /api/eval                                 reset the live matrix
 //
 // Threading: the pipeline, the DB, and the label are owned by the main thread. HTTP handlers
 // never touch them; they queue a command and wait for its reply, so no locks around the DB.
@@ -19,8 +25,10 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <deque>
+#include <fstream>
 #include <functional>
 #include <future>
 #include <iostream>
@@ -33,12 +41,14 @@
 #include <sstream>
 #include <thread>
 
+#include "app/auto_learn.h"
 #include "app/capture.h"
 #include "app/feature_db.h"
 #include "app/frame_source.h"
 #include "app/overlay.h"
 #include "app/pipeline.h"
 #include "core/classifier.h"
+#include "core/evaluation.h"
 
 namespace fs = std::filesystem;
 namespace orec = objectrecognition;
@@ -175,6 +185,42 @@ int main(int argc, char** argv) {
     FrameResult result;
     cv::Mat frame, display, regionsVis;
     bool advance = true;
+    std::string mode = "detect";
+    AutoLearn autoLearn;
+    orec::ConfusionMatrix liveMatrix;
+    std::string currentPrediction;  // this frame's label, "unknown", or "" with no object
+
+    const auto addSample = [&](const std::string& name) {
+        const orec::Sample sample{name, result.features.values};
+        appendSample(kDbPath, sample);
+        db.push_back(sample);
+        stdevs = orec::featureStdevs(db);
+    };
+
+    const auto matrixJson = [&] {
+        const auto rows = liveMatrix.rowLabels();
+        const auto cols = liveMatrix.columnLabels();
+        std::ostringstream out;
+        const auto list = [&](const std::vector<std::string>& v) {
+            out << '[';
+            for (size_t i = 0; i < v.size(); ++i) out << (i ? "," : "") << '"' << jsonEscape(v[i]) << '"';
+            out << ']';
+        };
+        out << R"({"rows":)";
+        list(rows);
+        out << R"(,"columns":)";
+        list(cols);
+        out << R"(,"counts":[)";
+        for (size_t r = 0; r < rows.size(); ++r) {
+            out << (r ? "," : "") << '[';
+            for (size_t c = 0; c < cols.size(); ++c)
+                out << (c ? "," : "") << liveMatrix.count(rows[r], cols[c]);
+            out << ']';
+        }
+        out << R"(],"total":)" << liveMatrix.total() << R"(,"accuracy":)" << liveMatrix.accuracy()
+            << '}';
+        return out.str();
+    };
 
     const auto dbJson = [&] {
         std::map<std::string, int> counts;
@@ -226,10 +272,7 @@ int main(int argc, char** argv) {
         sendJson(res, runOnPipeline(shared, [&] {
             if (label.empty()) return Reply{409, jsonError("set a label first")};
             if (!result.hasFeatures) return Reply{409, jsonError("no object detected")};
-            const orec::Sample sample{label, result.features.values};
-            appendSample(kDbPath, sample);
-            db.push_back(sample);
-            stdevs = orec::featureStdevs(db);
+            addSample(label);
             return Reply{200, dbJson()};
         }));
     });
@@ -265,6 +308,64 @@ int main(int argc, char** argv) {
         }));
     });
 
+    http.Put("/api/mode", [&](const httplib::Request& req, httplib::Response& res) {
+        std::string next;
+        if (!extractString(req.body, "mode", next) ||
+            (next != "detect" && next != "collect" && next != "evaluate")) {
+            sendJson(res, {400, jsonError("mode must be detect, collect, or evaluate")});
+            return;
+        }
+        sendJson(res, runOnPipeline(shared, [&, next] {
+            mode = next;
+            autoLearn = AutoLearn{};  // a half-finished prompt makes no sense in another mode
+            return Reply{200, R"({"mode":")" + mode + "\"}"};
+        }));
+    });
+
+    http.Post("/api/autolearn/label", [&](const httplib::Request& req, httplib::Response& res) {
+        std::string name;
+        if (!extractString(req.body, "label", name) || !isValidLabel(name)) {
+            sendJson(res, {400, jsonError("label must be 1-64 chars of [A-Za-z0-9_-]")});
+            return;
+        }
+        sendJson(res, runOnPipeline(shared, [&, name] {
+            if (!autoLearn.startCollecting(name, AutoLearn::Clock::now()))
+                return Reply{409, jsonError("no unknown object is waiting for a label")};
+            return Reply{200, R"({"collecting":")" + name + "\"}"};
+        }));
+    });
+
+    http.Post("/api/autolearn/dismiss", [&](const httplib::Request&, httplib::Response& res) {
+        sendJson(res, runOnPipeline(shared, [&] {
+            autoLearn.dismiss();
+            return Reply{200, "{}"};
+        }));
+    });
+
+    http.Get("/api/eval", [&](const httplib::Request&, httplib::Response& res) {
+        sendJson(res, runOnPipeline(shared, [&] { return Reply{200, matrixJson()}; }));
+    });
+
+    // The task's evaluation hook: the user states the true label, the system tallies its guess.
+    http.Post("/api/eval/record", [&](const httplib::Request&, httplib::Response& res) {
+        sendJson(res, runOnPipeline(shared, [&] {
+            if (label.empty()) return Reply{409, jsonError("set the true label first")};
+            if (currentPrediction.empty()) return Reply{409, jsonError("no object detected")};
+            liveMatrix.add(label, currentPrediction);
+            fs::create_directories("out/eval");
+            std::ofstream("out/eval/live_confusion.md") << liveMatrix.toMarkdown();
+            std::ofstream("out/eval/live_confusion.csv") << liveMatrix.toCsv();
+            return Reply{200, matrixJson()};
+        }));
+    });
+
+    http.Delete("/api/eval", [&](const httplib::Request&, httplib::Response& res) {
+        sendJson(res, runOnPipeline(shared, [&] {
+            liveMatrix = orec::ConfusionMatrix{};
+            return Reply{200, matrixJson()};
+        }));
+    });
+
     // Loopback only: the API can write files and delete DB rows, so it must not face the LAN.
     std::thread httpThread([&] {
         if (!http.listen("127.0.0.1", port)) {
@@ -295,24 +396,46 @@ int main(int argc, char** argv) {
         runPipeline(frame, result);
         frame.copyTo(display);
         colorizeRegions(result.regionMap, regionsVis);
+        const auto frameTime = AutoLearn::Clock::now();
+
+        // Classify once per frame; status, auto-learn, and evaluation all reuse it.
+        const bool canClassify = result.hasFeatures && db.size() >= 2;
+        orec::Match match{};
+        if (canClassify)
+            match = orec::classifyNearest(db, stdevs, result.features.values, unknownThreshold);
+        // With fewer than 2 samples nothing can be recognised, so every object counts as
+        // unknown: that is what lets auto-learn bootstrap an empty DB.
+        const bool unknown = result.hasFeatures && (!canClassify || !match.known);
+        currentPrediction = !result.hasFeatures ? "" : unknown ? "unknown" : match.label;
+
+        if (mode == "detect") {
+            const double diagonal = std::hypot(frame.cols, frame.rows);
+            autoLearn.update(result.hasFeatures, unknown, result.features.centroid, diagonal,
+                             frameTime);
+            if (result.hasFeatures && autoLearn.wantsSample(frameTime)) {
+                addSample(autoLearn.label());
+                autoLearn.sampleTaken(frameTime);
+            }
+        }
 
         std::ostringstream status;
-        status << R"({"threshold":)" << result.threshold << R"(,"label":")" << jsonEscape(label)
-               << R"(","source":")" << jsonEscape(source.currentName()) << R"(","still":)"
+        status << R"({"mode":")" << mode << R"(","threshold":)" << result.threshold
+               << R"(,"label":")" << jsonEscape(label) << R"(","source":")"
+               << jsonEscape(source.currentName()) << R"(","still":)"
                << (source.isStill() ? "true" : "false") << R"(,"dbSize":)" << db.size()
                << R"(,"unknownThreshold":)" << unknownThreshold << R"(,"fps":)"
-               << cv::format("%.1f", fps) << R"(,"object":)";
+               << cv::format("%.1f", fps) << R"(,"autoLearn":{"state":")"
+               << toString(autoLearn.state()) << R"(","progress":)"
+               << cv::format("%.2f", autoLearn.holdProgress(frameTime)) << R"(,"label":")"
+               << jsonEscape(autoLearn.label()) << R"(","collected":)" << autoLearn.collected()
+               << R"(,"target":)" << autoLearn.targetSamples() << R"(},"object":)";
         if (result.hasFeatures) {
-            std::string text = "object";
             status << R"({"features":{)";
             for (size_t i = 0; i < result.features.values.size(); ++i)
                 status << (i ? "," : "") << '"' << orec::kFeatureNames[i]
                        << "\":" << result.features.values[i];
             status << R"(},"prediction":)";
-            if (db.size() >= 2) {
-                const auto match = orec::classifyNearest(db, stdevs, result.features.values,
-                                                         unknownThreshold);
-                text = match.known ? match.label : "unknown";
+            if (canClassify) {
                 status << R"({"label":")" << jsonEscape(match.label) << R"(","distance":)"
                        << match.distance << R"(,"known":)" << (match.known ? "true" : "false")
                        << "}";
@@ -320,6 +443,16 @@ int main(int argc, char** argv) {
                 status << "null";
             }
             status << "}";
+
+            std::string text = canClassify ? currentPrediction : "object";
+            if (autoLearn.state() == AutoLearn::State::Tracking)
+                text = cv::format("unknown %.1fs",
+                                  autoLearn.holdProgress(frameTime) * autoLearn.holdSeconds());
+            else if (autoLearn.state() == AutoLearn::State::Prompt)
+                text = "unknown: name me";
+            else if (autoLearn.state() == AutoLearn::State::Collecting)
+                text = cv::format("learning %s %d/%d", autoLearn.label().c_str(),
+                                  autoLearn.collected(), autoLearn.targetSamples());
             drawFeatures(display, result.features, text);
         } else {
             status << "null";

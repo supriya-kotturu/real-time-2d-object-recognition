@@ -39,6 +39,7 @@ class AutoLearn {
     const std::string& label() const { return label_; }
     int collected() const { return collected_; }
     int targetSamples() const { return config_.samples; }
+    double holdSeconds() const { return config_.holdSeconds; }
     double holdProgress(Clock::time_point now) const;  // 0..1 while Tracking
 
    private:
