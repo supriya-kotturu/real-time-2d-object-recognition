@@ -23,9 +23,9 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 | D-14 | 2026-10-24 | T7 evaluation protocol | AGENT | decided: task protocol (b) |
 | D-15 | 2026-10-24 | GUI modes + auto-learn | AGENT (you architect) | decided |
 | D-16 | 2026-10-24 | YOLO vs ResNet18 for T9 | SNIPPET | decided: ResNet18 |
-| D-17 | 2026-10-24 | Auto-learn: per-pose capture instead of a frame burst | AGENT (you architect) | open: A button vs B motion-gated |
+| D-17 | 2026-10-24 | Auto-learn: per-pose capture instead of a frame burst | AGENT (you architect) | decided: B motion-gated, built |
 | D-18 | 2026-10-24 | T9 port of instructor utilities + model handling | AGENT | decided, built |
-| D-19 | 2026-10-24 | Model delivery for the Netlify (browser) version | AGENT (you architect) | open, post-deadline |
+| D-19 | 2026-10-24 | Model delivery for the Netlify (browser) version | AGENT (you architect) | decided: build-time fetch + cache (LFS question open) |
 | D-05 | 2026-10-23 | Headless tests + 4/8-conn visual dump for from-scratch stages | AGENT harness, HAND expected values | decided |
 
 ---
@@ -240,3 +240,8 @@ Built: `c90d385` (ROI + embedder + cosine; mutation-checked test), `58a570c` (ev
 ## D-19 — Model delivery for the browser version (open, post-deadline)
 
 The model isn't in git, so Netlify's build must get it some other way. Options are in the session: build-time fetch + SHA-256 check; Git LFS; external CDN fetched at runtime; plus a smaller/quantised model for the browser.
+
+### D-17 / D-19 decisions (2026-10-24)
+
+- **D-17:** B, auto-capture on move. Built: a new pose needs ≥ 10% diagonal move or ≥ 20° rotation (undirected axis), then 0.6 s still; 5 poses; Stop = keep samples + no re-prompt until the object leaves.
+- **D-19:** ResNet18 fetched at Netlify build time (URL + SHA-256 from `data/models/README.md`), served with a content-hashed filename and `Cache-Control: immutable` so returning users don't re-download. **Open:** Git LFS instead. You like its workflow fit; how Netlify builds treat LFS objects is unverified (check Netlify's docs), and builds pulling LFS objects use GitHub's LFS bandwidth quota.
