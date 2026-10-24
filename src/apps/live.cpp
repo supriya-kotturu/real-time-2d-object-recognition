@@ -7,17 +7,13 @@
 //             and each stage -> out/stages/<stage>/<label>/<timestamp>.png   (D-06)
 //       any other key -> next still image
 
-#include <chrono>
-#include <ctime>
 #include <filesystem>
-#include <iomanip>
 #include <iostream>
 #include <opencv2/core/utils/logger.hpp>
 #include <opencv2/highgui.hpp>
-#include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
-#include <sstream>
 
+#include "app/capture.h"
 #include "app/feature_db.h"
 #include "app/frame_source.h"
 #include "app/overlay.h"
@@ -33,29 +29,6 @@ const std::string kDbPath = "data/db/features.csv";
 // Scaled-Euclidean distance above which the nearest match is reported as unknown.
 // Placeholder until it's tuned on real captures (GUI slider later).
 constexpr double kUnknownThreshold = 3.0;
-
-// Millisecond resolution so two quick 's' presses never overwrite each other.
-std::string timestamp() {
-    using namespace std::chrono;
-    const auto now = system_clock::now();
-    const std::time_t secs = system_clock::to_time_t(now);
-    const auto ms = duration_cast<milliseconds>(now.time_since_epoch()).count() % 1000;
-    std::tm local{};
-#ifdef _WIN32
-    localtime_s(&local, &secs);
-#else
-    localtime_r(&secs, &local);
-#endif
-    std::ostringstream out;
-    out << std::put_time(&local, "%Y%m%d-%H%M%S") << '-' << std::setw(3) << std::setfill('0')
-        << ms;
-    return out.str();
-}
-
-void saveImage(const fs::path& dir, const std::string& file, const cv::Mat& img) {
-    fs::create_directories(dir);
-    cv::imwrite((dir / file).string(), img);
-}
 
 }  // namespace
 
@@ -116,6 +89,10 @@ int main(int argc, char** argv) {
             // record why in decisions.md and fall back to a --label CLI arg (option a).
             std::cout << "label (click this terminal, type, Enter): " << std::flush;
             std::getline(std::cin, label);
+            if (!isValidLabel(label)) {
+                std::cout << "labels may only use letters, digits, _ and -\n";
+                label.clear();
+            }
         }
         if (key == 't') {
             if (label.empty() || !result.hasFeatures) {

@@ -42,6 +42,7 @@ add_library(objrec_app STATIC
 	src/app/pipeline.cpp
 	src/app/overlay.cpp
 	src/app/feature_db.cpp
+	src/app/capture.cpp
 )
 target_include_directories(objrec_app PUBLIC "${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(objrec_app PUBLIC objrec_core ${OpenCV_LIBS})
@@ -66,3 +67,4 @@ endfunction()
 add_objrec_executable(live src/apps/live.cpp)
 add_objrec_executable(inspect src/apps/inspect.cpp)
 add_objrec_executable(tests tests/morphology_tests.cpp)  # D-05
+
