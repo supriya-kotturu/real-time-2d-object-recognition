@@ -22,8 +22,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} app-root`}>
-      <body className="app-body">
+    // suppressHydrationWarning: extensions like Grammarly inject attributes into <html>/<body>
+    // before React hydrates. It only silences attribute diffs on these two elements.
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} app-root`}
+      suppressHydrationWarning
+    >
+      <body className="app-body" suppressHydrationWarning>
         {children}
         <Toaster position="bottom-right" />
       </body>
