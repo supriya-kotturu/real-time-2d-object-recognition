@@ -23,7 +23,25 @@ export interface DetectedObject {
   prediction: Prediction | null;
 }
 
+export type Mode = "detect" | "collect" | "evaluate";
+
+export const MODES: { value: Mode; label: string }[] = [
+  { value: "detect", label: "Detect" },
+  { value: "collect", label: "Collect" },
+  { value: "evaluate", label: "Evaluate" },
+];
+
+export interface AutoLearnStatus {
+  state: "idle" | "tracking" | "prompt" | "collecting";
+  progress: number; // 0..1 of the hold window while tracking
+  label: string;
+  collected: number;
+  target: number;
+}
+
 export interface Status {
+  mode: Mode;
+  autoLearn: AutoLearnStatus;
   threshold: number;
   label: string;
   source: string;
@@ -32,6 +50,14 @@ export interface Status {
   unknownThreshold: number;
   fps: number;
   object: DetectedObject | null;
+}
+
+export interface EvalMatrix {
+  rows: string[];
+  columns: string[];
+  counts: number[][];
+  total: number;
+  accuracy: number;
 }
 
 export interface DbSummary {
@@ -65,6 +91,17 @@ export const api = {
   train: () => request<DbSummary>("/api/train", { method: "POST" }),
   capture: () => request<{ saved: string }>("/api/capture", { method: "POST" }),
   next: () => request<object>("/api/next", { method: "POST" }),
+  setMode: (mode: Mode) =>
+    request<{ mode: Mode }>("/api/mode", { method: "PUT", body: JSON.stringify({ mode }) }),
+  autoLearnLabel: (label: string) =>
+    request<{ collecting: string }>("/api/autolearn/label", {
+      method: "POST",
+      body: JSON.stringify({ label }),
+    }),
+  autoLearnDismiss: () => request<object>("/api/autolearn/dismiss", { method: "POST" }),
+  evalMatrix: () => request<EvalMatrix>("/api/eval"),
+  evalRecord: () => request<EvalMatrix>("/api/eval/record", { method: "POST" }),
+  evalReset: () => request<EvalMatrix>("/api/eval", { method: "DELETE" }),
   setUnknownThreshold: (unknownThreshold: number) =>
     request<{ unknownThreshold: number }>("/api/settings", {
       method: "PUT",

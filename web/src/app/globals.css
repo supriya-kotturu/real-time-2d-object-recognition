@@ -212,6 +212,23 @@
     @apply text-xs text-destructive;
   }
 
+  .header-actions {
+    @apply flex flex-wrap items-center gap-3;
+  }
+
+  .autolearn-alert {
+    @apply ring-2 ring-amber-500/70;
+  }
+  .autolearn-question {
+    @apply text-base font-medium;
+  }
+  .progress-caption {
+    @apply w-full text-sm text-muted-foreground;
+  }
+  .matrix-hit {
+    @apply text-right font-mono font-semibold tabular-nums text-foreground;
+  }
+
   .setting-row {
     @apply flex items-center justify-between text-sm;
   }
