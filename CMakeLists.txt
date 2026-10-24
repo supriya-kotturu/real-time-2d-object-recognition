@@ -68,3 +68,7 @@ add_objrec_executable(live src/apps/live.cpp)
 add_objrec_executable(inspect src/apps/inspect.cpp)
 add_objrec_executable(tests tests/morphology_tests.cpp)  # D-05
 
+# Web GUI backend (D-13). cpp-httplib v0.60.1 is vendored header-only; SYSTEM keeps its
+# warnings out of our /W4 output.
+add_objrec_executable(server src/apps/server.cpp)
+target_include_directories(server SYSTEM PRIVATE "${PROJECT_SOURCE_DIR}/third_party/cpp-httplib")

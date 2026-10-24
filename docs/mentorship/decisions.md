@@ -19,6 +19,7 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 | D-10 | 2026-10-24 | Extension set | mixed | decided (metric open) |
 | D-11 | 2026-10-24 | AI-first build: you hand-code T1 (done) + T2; agent builds the rest; you pass a review per part | mixed | decided |
 | D-12 | 2026-10-24 | Feature DB format | AGENT | decided |
+| D-13 | 2026-10-24 | Web GUI architecture (localhost) | AGENT (you architect) | **proposed: review before merge** |
 | D-05 | 2026-10-23 | Headless tests + 4/8-conn visual dump for from-scratch stages | AGENT harness, HAND expected values | decided |
 
 ---
@@ -148,3 +149,22 @@ Status: `open` → `decided` → (`superseded by D-xx`).
   - `live` keys: `t` = train; `inspect` = headless report images + `out/stages/features.csv`.
   - Verified on the dev set: OBB and axis align on img4P3; cardboard is excluded as a border region; img1p3 (yellow) finds no object, as predicted from grayscale ≈ 227.
   - **Pending your review checks.**
+
+## D-13 — Web GUI architecture (localhost)
+
+**Status:** PROPOSED. Built overnight on `stack/objrec` while you slept; nothing is merged. Reject or amend at review.
+**Your constraints:** latest stable Next.js + TypeScript + Tailwind + shadcn/ui; long class lists wrapped in custom class names; counts as the "better GUI" extension. Public web/Netlify/WASM stays post-deadline (D-03).
+
+**Shape:** `server.exe` (C++, the same runPipeline as live) ⇄ HTTP ⇄ Next.js app in `web/`.
+
+| Choice | Picked | Alternatives and why not |
+| --- | --- | --- |
+| Video transport | **MJPEG** (`multipart/x-mixed-replace`) | WebSocket JPEG frames: needs JS decode→canvas, more code, no gain on loopback. WebRTC: lowest latency but signalling + codecs; overkill locally. Polling snapshots: simplest, but per-frame request overhead + latency. |
+| C++ HTTP lib | **cpp-httplib v0.60.1** (header-only, MIT, vendored) | Crow/Drogon: frameworks with build deps. Boost.Beast: Boost on Windows = hours of setup. |
+| Status updates | **Poll `/api/status` every 250 ms** | SSE/WebSocket push: fresher, but another streaming endpoint for a few JSON fields. |
+| CORS | **Next rewrites** `/api/*` → `127.0.0.1:8080`; `<img>` loads the stream directly from :8080 | CORS headers in C++: fine too, but rewrites keep the browser same-origin; rewrite proxies may buffer multipart, so the stream bypasses it. |
+| Concurrency | **Command queue → pipeline thread** (handlers wait on a promise) | Mutex around the DB/label: every handler then races the frame loop. |
+
+**Security:** binds 127.0.0.1 only (the API writes files and deletes DB rows). Labels are validated as `[A-Za-z0-9_-]{1,64}` (blocks `../` traversal). httplib is pinned past every published GHSA (latest fix: 0.51.0).
+**Verified:** curl smoke test on the dev set: status, label validation, next, settings, db, a 2 s stream (~224 KB), bad view → 400.
+**Questions for you:** (1) MJPEG vs WebSocket: agree? (2) Is 250 ms polling acceptable? (3) Should the GUI also expose auto-learn (extension 1) once it's built?
