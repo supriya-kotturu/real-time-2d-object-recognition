@@ -254,3 +254,7 @@ The model isn't in git, so Netlify's build must get it some other way. Options a
 **Implemented as you specified:** forward pass assigns `min(UP, LEFT [, UP_LEFT, UP_RIGHT]) + 1` with bg/fg init in the same loop; backward `min(curr, min(DOWN, RIGHT [, DOWN_LEFT, DOWN_RIGHT]) + 1)`; shrink removes `dist <= n`.
 **Where it differs from your comments:** (1) grow runs grassfire on the *inverted* image and keeps `dist <= n` (your comment had `>= n` on the original); (2) grow treats outside-the-image as *far* (rows + cols), not as background. Otherwise every bg pixel within n of the image edge would turn fg, because in the inverted image the D-08 border policy means "the border is original foreground".
 **Verified:** tests.exe 0 failed; out/tests shows the diamond (4-conn) vs square (8-conn).
+
+### D-05 amendment (2026-10-24, 14:50)
+
+Hand-computing the 6 TODO grids is skipped for time. The two hand-checked cases (3×3 grassfire, shrink 1) pass, and the 4- vs 8-conn behaviour is verified visually in out/tests. The TODO cases stay in tests.exe as reported TODOs.
