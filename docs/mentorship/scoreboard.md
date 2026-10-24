@@ -6,7 +6,7 @@ Rules:
 - **−1** — a hint already given (listed in `hints.md`) has to be given again.
 - Progress update every 6h of active work. Measured from the `Last update` timestamp below; checked at the start of every session.
 
-**Total: +9**
+**Total: +10**
 **Last update:** 2026-10-24 ~00:00 (checkpoint 1). Next one due after 6 more hours of work.
 
 ## Ledger
@@ -47,6 +47,7 @@ Rules:
 | 2026-10-24 | +1 | DB format: rejected the header row via YAGNI on your own ("no one opens it; change the code if needed") | H-17 |
 | 2026-10-24 | +1 | Designed GUI modes (detect w/ auto-learn prompt vs collect) that map directly onto the task's evaluation hook + auto-learn extension | D-15 |
 | 2026-10-24 | +1 | Rejected YOLO on concrete costs (per-class retraining, no server compute on Netlify) instead of hype | D-16 |
+| 2026-10-24 | +1 | Spotted that a burst of near-identical frames gives no pose diversity (also the root cause of the zero-stdev bug); proposed per-pose capture | D-17 |
 
 ## Progress updates
 

@@ -23,6 +23,9 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 | D-14 | 2026-10-24 | T7 evaluation protocol | AGENT | decided: task protocol (b) |
 | D-15 | 2026-10-24 | GUI modes + auto-learn | AGENT (you architect) | decided |
 | D-16 | 2026-10-24 | YOLO vs ResNet18 for T9 | SNIPPET | decided: ResNet18 |
+| D-17 | 2026-10-24 | Auto-learn: per-pose capture instead of a frame burst | AGENT (you architect) | open: A button vs B motion-gated |
+| D-18 | 2026-10-24 | T9 port of instructor utilities + model handling | AGENT | decided, built |
+| D-19 | 2026-10-24 | Model delivery for the Netlify (browser) version | AGENT (you architect) | open, post-deadline |
 | D-05 | 2026-10-23 | Headless tests + 4/8-conn visual dump for from-scratch stages | AGENT harness, HAND expected values | decided |
 
 ---
@@ -217,3 +220,23 @@ See session: YOLO is a detector over fixed (COCO) classes, not a one-shot embedd
 - **D-03/D-13:** the public (Netlify) version processes **in the browser** (hybrid, client compute). No WebRTC: frames never leave the browser. The localhost GUI keeps MJPEG.
 - **D-15:** three modes: **Detect** (auto-learn after **3 s** unknown + stationary), **Collect**, **Evaluate** (live confusion matrix via a true-label hook).
 - **D-16:** ResNet18 one-shot embedding for T9. YOLO rejected: per-class retraining cost, no one-shot, no Netlify compute budget, AGPL. Still open: instructor's ONNX (Canvas) vs a public ONNX-zoo ResNet18.
+
+## D-17 — Auto-learn per-pose capture (open)
+
+**Your insight:** 5 frames 0.4 s apart of a still object are near-identical: no pose diversity, ~0 stdev (the root cause behind the stdev-floor fix in `89fe735`).
+**Options:** (A) a "Capture pose" button per pose. (B) motion-gated: after each sample, require a move ≥ ~10% of the frame or a rotation ≥ ~20°, then stillness, then auto-capture. Hands stay free for the demo.
+
+## D-18 — T9 port + model handling (open)
+
+- **Model:** `data/models/resnet18-v2-7.onnx` (ONNX zoo, 46.8 MB, sha256 `3b4d0480…824b`). Probe: OpenCV 5 loads it with both ENGINE_CLASSIC and ENGINE_NEW; `forward("onnx_node!resnetv22_flatten0_reshape0")` → 1×512 on both.
+- **Instructor utilities.cpp issues:** (1) includes the prof's features.h/vision.h; (2) `M_PI` needs `_USE_MATH_DEFINES` on MSVC; (3) the debug `cv::rectangle` is drawn on the image *before* the ROI crop, so a 4 px gray frame leaks into every embedding; (4) the E2 "up" convention must be verified against our y-down extents; (5) `getRotationMatrix2D` → `<opencv2/geometry.hpp>` in OpenCV 5; (6) its comment says to embed the thresholded image, but Task 9 says the original.
+- **Proposed:** port to `app/embedding.{h,cpp}` with attribution plus a rotation test; move the original unmodified to `third_party/maxwell/`; gitignore `*.onnx` with a README link + sha256.
+
+### D-18 outcome (2026-10-24)
+
+Decided: the original lives unmodified in `third_party/maxwell/` as reference; our own OpenCV 5 utils are in `app/embedding.{h,cpp}`; `*.onnx` is gitignored with URL + SHA-256 in `data/models/README.md`.
+Built: `c90d385` (ROI + embedder + cosine; mutation-checked test), `58a570c` (eval `--one-shot` + features-vs-embedding comparison; inspect writes `out/stages/roi/`).
+
+## D-19 — Model delivery for the browser version (open, post-deadline)
+
+The model isn't in git, so Netlify's build must get it some other way. Options are in the session: build-time fetch + SHA-256 check; Git LFS; external CDN fetched at runtime; plus a smaller/quantised model for the browser.
