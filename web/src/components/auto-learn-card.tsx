@@ -33,7 +33,7 @@ export function AutoLearnCard({ autoLearn }: { autoLearn: AutoLearnStatus | unde
     <Card className={state === "prompt" ? "autolearn-alert" : undefined}>
       <CardHeader>
         <CardTitle>Auto-learn</CardTitle>
-        <CardDescription>Unknown objects held still for 3 s get added to the DB</CardDescription>
+        <CardDescription>Unknown objects held still for 3 s are learned, one sample per pose</CardDescription>
       </CardHeader>
       <CardContent className="control-stack">
         {state === "idle" && (
@@ -68,11 +68,22 @@ export function AutoLearnCard({ autoLearn }: { autoLearn: AutoLearnStatus | unde
         )}
 
         {state === "collecting" && autoLearn && (
-          <Progress value={(autoLearn.collected / autoLearn.target) * 100}>
-            <span className="progress-caption">
-              Learning {autoLearn.label}: {autoLearn.collected}/{autoLearn.target} samples
-            </span>
-          </Progress>
+          <>
+            <Progress value={(autoLearn.collected / autoLearn.target) * 100}>
+              <span className="progress-caption">
+                Learning {autoLearn.label}: pose {autoLearn.collected}/{autoLearn.target}
+              </span>
+            </Progress>
+            {/* One sample per pose (D-17): identical frames would teach the DB nothing. */}
+            <p className="autolearn-question">
+              {autoLearn.phase === "move"
+                ? "Move or rotate the object to a new pose"
+                : "Hold still…"}
+            </p>
+            <Button variant="outline" onClick={dismiss}>
+              <X /> Stop
+            </Button>
+          </>
         )}
       </CardContent>
     </Card>

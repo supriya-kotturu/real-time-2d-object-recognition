@@ -37,6 +37,7 @@ export interface AutoLearnStatus {
   label: string;
   collected: number;
   target: number;
+  phase: "move" | "hold"; // while collecting: waiting for a new pose vs settling on one
 }
 
 export interface Status {
