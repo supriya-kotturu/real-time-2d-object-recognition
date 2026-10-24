@@ -1,7 +1,8 @@
 // Headless batch run of tasks 1-4 over an image directory. Produces the report's required
 // images and feature vectors without clicking through windows.
 // Usage: inspect [image-dir]   (default: data/examples)
-// Writes out/stages/{threshold,regions,features}/<stem>.png and out/stages/features.csv
+// Writes out/stages/{threshold,regions,features,roi}/<stem>.png and out/stages/features.csv
+// (roi = Task 9 steps A-C: the original image rotated so the primary axis lies along x).
 
 #include <filesystem>
 #include <fstream>
@@ -10,6 +11,7 @@
 #include <opencv2/core/utils/logger.hpp>
 #include <opencv2/imgcodecs.hpp>
 
+#include "app/embedding.h"
 #include "app/frame_source.h"
 #include "app/overlay.h"
 #include "app/pipeline.h"
@@ -28,7 +30,7 @@ int main(int argc, char** argv) {
     }
 
     const fs::path out = "out/stages";
-    for (const char* stage : {"threshold", "regions", "features"})
+    for (const char* stage : {"threshold", "regions", "features", "roi"})
         fs::create_directories(out / stage);
     std::ofstream csv(out / "features.csv");
     csv << "image";
@@ -36,7 +38,7 @@ int main(int argc, char** argv) {
     csv << '\n';
 
     FrameResult result;
-    cv::Mat frame, regionsVis, display;
+    cv::Mat frame, regionsVis, display, roi;
     while (source.next(frame)) {
         runPipeline(frame, result);
         const std::string file = source.currentName() + ".png";
@@ -55,6 +57,9 @@ int main(int argc, char** argv) {
             std::cout << "  (no central region off the border)\n";
             continue;
         }
+        if (extractAlignedRoi(frame, result.regionMap, result.regions[result.primary].id,
+                              result.features, roi))
+            cv::imwrite((out / "roi" / file).string(), roi);
         csv << source.currentName();
         std::cout << "  ";
         for (size_t i = 0; i < result.features.values.size(); ++i) {
@@ -65,6 +70,6 @@ int main(int argc, char** argv) {
         csv << '\n';
         std::cout << "\n";
     }
-    std::cout << "wrote " << out.string() << "/{threshold,regions,features}/ and features.csv\n";
+    std::cout << "wrote " << out.string() << "/{threshold,regions,features,roi}/ and features.csv\n";
     return 0;
 }
