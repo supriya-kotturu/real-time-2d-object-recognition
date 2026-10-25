@@ -1,21 +1,33 @@
-# D-26: Netlify serves the static GUI; server.exe runs on the Hugging Face Space. Production
-# deploys from main; branch deploys (e.g. stack-objrec--<site>.netlify.app) test first.
+# D-27: Netlify serves a static site and nothing else. The recognition pipeline (our C++ as
+# WebAssembly) and ResNet18 (onnxruntime-web) run in the visitor's browser, in a Web Worker.
+# Production deploys from main; branch deploys (<branch>--<site>.netlify.app) test first.
 
 [build]
   base = "web"
-  command = "OBJREC_EXPORT=1 npm run build"
+  command = "npm run build:wasm"
   publish = "out"
 
 [build.environment]
   NODE_VERSION = "22"
-  # The MJPEG stream and the camera WebSocket go straight to the Space: Netlify's proxy
-  # doesn't carry WebSocket upgrades, and buffering a multipart stream would stall it.
-  NEXT_PUBLIC_STREAM_ORIGIN = "https://supriya-kotturu-real-time-object-recognition.hf.space"
 
-# JSON API through Netlify, so fetches stay same-origin (no CORS preflights). The browser's
-# Origin is forwarded, which the Space admits via --allow-origin.
-[[redirects]]
-  from = "/api/*"
-  to = "https://supriya-kotturu-real-time-object-recognition.hf.space/api/:splat"
-  status = 200
-  force = true
+# Module workers refuse scripts served with a non-JavaScript type.
+[[headers]]
+  for = "/wasm/objrec.mjs"
+  [headers.values]
+    Content-Type = "text/javascript"
+
+[[headers]]
+  for = "/ort/ort-wasm-simd-threaded.jsep.mjs"
+  [headers.values]
+    Content-Type = "text/javascript"
+
+# Several MB of wasm per visit otherwise; must-revalidate keeps a redeploy from serving stale code.
+[[headers]]
+  for = "/wasm/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/ort/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

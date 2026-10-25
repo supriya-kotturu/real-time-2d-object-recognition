@@ -348,3 +348,20 @@ Toggle features | embedding (ResNet18) in the GUI. Embedding DB per model (H-01)
 
 Commits `5b7734d`..`c643d34`. ResNet18 costs ~40 ms/frame (features ~10 ms).
 **Report finding (T9 discussion):** a uniform +10 grey-level brightness shift (Chrome's fake camera) flipped eval's hardest toy-car test image (cosine 0.26, the split's max correct distance) to keychain. The embedding is exposure-sensitive; shape features are thresholded and much less so. Real auto-exposure varies more, so expect the live accuracy to sit below the 47/47 split score.
+
+## D-27 — Netlify without a server: pipeline in the browser (decided 2026-10-24 evening)
+
+**Context:** HF Docker Spaces now need PRO (402 on create); free Docker hosts are 0.1 CPU or need a card.
+**Your call:** "W1" — compile the C++ pipeline (OpenCV 5 core/imgproc/geometry + objrec_core + ROI) to WASM with Emscripten, run it plus onnxruntime-web (ResNet18) in a Web Worker, classify in TS; Netlify only. "Stick with it; willing to burn midnight oil."
+**Trade-off stated by the mentor:** ~1 day with an unknown (OpenCV 5 WASM build on Windows), none of the 30 points depend on it; chosen over W2 (TS rewrite: two implementations that can disagree with the report) and paid/slow servers.
+**Kept:** the same C++ code as the report numbers; the `FrameSink` seam (a `WasmSink` replaces `ServerSink`).
+**Open:** the probing question (what must happen to a frame before ResNet18 can embed it?) is still unanswered.
+
+### D-27 built (2026-10-24, night)
+
+Commits `f645167` (Session extracted from server.exe), `ea6729d` (C++ → WebAssembly: OpenCV 5 core/imgproc/geometry via emsdk 3.1.74 in Docker), `11b7e02` (Web Worker: WASM pipeline + onnxruntime-web 1.30.0), Netlify config.
+**Equivalence (the reason for W1 over W2):** same PNGs through server.exe and the WASM module give identical thresholds, features (relative diff 0), predictions and distances; the browser's ResNet18 embedding matches OpenCV dnn's (cosine distance 8e-8).
+**Model:** fetched from the ONNX zoo's LFS host (github.com's redirect has no CORS header), SHA-256 checked, embedding declared as an extra output by a 46-byte protobuf splice (ORT only returns declared outputs). Not re-hosted.
+**Speed in the browser:** hand features ~10 fps; ResNet18 ~3.6 fps (~270 ms/frame, single-threaded wasm; threads would need COOP/COEP, H-09).
+**Deployed (draft):** https://6add760903fe7c39632e08fc--real-time-object-recognition.netlify.app, verified with headless Chrome (samples correct under ResNet18). Production URL waits for main (your review), via GitHub-connected builds.
+**Superseded:** the HF Space plan (D-26 hosting; Docker Spaces need PRO). `server --public`, the Dockerfile and `--allow-origin` remain for self-hosting.
