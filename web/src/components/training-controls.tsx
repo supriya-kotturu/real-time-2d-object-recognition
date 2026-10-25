@@ -94,6 +94,13 @@ export function TrainingControls({ status, onTrained }: TrainingControlsProps) {
             </Button>
           )}
         </div>
+        {hasLabel && !hasObject && (
+          // Train needs a segmented object; without this the button just greys out silently.
+          <p className="control-hint">
+            No object found. The pipeline looks for one dark object on a light, plain background
+            that doesn&apos;t touch the edge of the picture. Check the Threshold and Regions views.
+          </p>
+        )}
         {status?.still && (
           <Button
             variant="ghost"
