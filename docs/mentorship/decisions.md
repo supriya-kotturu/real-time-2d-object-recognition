@@ -328,3 +328,23 @@ Toggle features | embedding (ResNet18) in the GUI. Embedding DB per model (H-01)
 - **Sources:** browser camera is the default (`server` with no args); IP Webcam/camera index/video/dir stay as options (`server <src>`). Your trade-off: "okay to give different options". Bookmark branch `archive/ipwebcam` (at `db84296`) is kept and never deleted.
 - **Flow control (H-50):** one frame in flight. The server acks a frame only once the pipeline has consumed it; the browser sends the next frame on the ack. A single-slot mailbox (latest wins) covers several tabs.
 - **Open:** hosting server.exe "for a limited time" (your follow-up); options in the session.
+
+## D-25 decided (session 2, 2026-10-24)
+
+- Embedding computed **only while ResNet18 is selected** (no fps cost in features mode).
+- Train / Collect / auto-learn append to **both** DBs (`data/db/features.csv`, `data/db/embeddings_resnet18.csv`, keyed per model, H-01); `train --embed` rebuilds the embedding DB.
+- **Metric dropdown:** Features → scaled Euclidean; ResNet18 → cosine (default) | SSD. One unknown cutoff per metric, defaults from eval's correct-match distances (one-shot split max: features 3.5 → 3.0 kept, cosine 0.36 → 0.35, SSD 522 → 500), sliders stay.
+- Evidence (T7 split incl. keychain/spects, 47 tests): features 26/47, cosine 47/47, SSD 45/47.
+
+## D-26 — Public deployment (decided 2026-10-24)
+
+**Your call:** deploy before the deadline so the URL can go in the readme and you can talk about it; the course doesn't mention URLs; local + IP Webcam stay as the fallback.
+**Shape (B):** Docker on Hugging Face Spaces (your account). OpenCV 5 built from source, server.exe serves the static Next export at `/` (one origin), model fetched at build with SHA-256 (D-19).
+**Public mode (`--public`):** Capture (saving images) disabled; every other feature works for every visitor. DB writes are memory-only (shared until restart, "Reset DB" button), so the repo's DB is never modified. One camera connection at a time. A sample-images source so graders without your objects still see recognition work.
+**Kill switch:** no container serving sample images by hour 3 → stop, fall back to video + readme.
+**Mentor's objection (logged):** a URL isn't a submission requirement; graders without the objects see "unknown"; 4–6 h of risk against ~10 h of graded work.
+
+### D-25 built + finding (2026-10-24 ~18:30)
+
+Commits `5b7734d`..`c643d34`. ResNet18 costs ~40 ms/frame (features ~10 ms).
+**Report finding (T9 discussion):** a uniform +10 grey-level brightness shift (Chrome's fake camera) flipped eval's hardest toy-car test image (cosine 0.26, the split's max correct distance) to keychain. The embedding is exposure-sensitive; shape features are thresholded and much less so. Real auto-exposure varies more, so expect the live accuracy to sit below the 47/47 split score.
