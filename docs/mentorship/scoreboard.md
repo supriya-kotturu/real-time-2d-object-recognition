@@ -7,7 +7,7 @@ Rules:
 - Progress update every 6h of active work. Measured from the `Last update` timestamp below; checked at the start of every session.
 
 **Total: +13**
-**Last update:** 2026-10-24 ~18:00 (checkpoint 2). Next one due after 6 more hours of work.
+**Last update:** 2026-10-25 ~01:00 (checkpoint 3). Next one due after 6 more hours of work.
 
 ## Ledger
 
@@ -98,3 +98,20 @@ Rules:
 3. **Pseudocode → code jumps:** code got written before the pseudocode round finished, and gaps carried over.
 
 **Next focus:** answer the explain-it-back and review checks (Q&A prep, D-20 condition), then the demo video and report.
+
+
+### Checkpoint 3: 2026-10-25 ~01:00 (session 2, ~18:00 → 01:00, ~7 h of active work)
+
+**Score: +13** (+5 this session, no losses). Trend: +8 → +13, the first period with no repeated hints.
+
+**Strengths**
+- **Architecture judgment, again the strongest skill.** You caught that a browser→server design has no home on Netlify; when hosting turned out to cost money you proposed the serverless worker yourself (D-27), and it shipped, with the C++ running bit-identically in the browser.
+- **Debugging from evidence.** The phone test: you read the Threshold/Regions views and traced "ball" to segmentation (hand merged, border rule, camera ring), not to the classifier. That is exactly the reasoning the Q&A rewards.
+- **Product sense.** Contrast of the lime box on white paper, persistence across refresh, a gallery with delete: all caught before users hit them.
+
+**Recurring gaps**
+1. **Questions skipped or half-answered (the main one).** The frame → ResNet18 probe took four asks; the two-part questions (closed-set NN, skin masking, face test) were answered on one part only. The Q&A will ask both halves.
+2. **Location vs mechanism.** You point at the right function (`extractAlignedRoi`) or quote its comment, but stop before explaining *how* it works (which angle, from which task, why the 180° flip). Practise saying the mechanism out loud.
+3. **Closed-set intuition.** "ResNet can detect any image" → it only *compares* against stored examples. Worth one sentence in the report.
+
+**Next focus:** the explain-it-back list (grassfire ×3, T3, T4, T6) answered in full, both halves; then the report images and the T8 video.
