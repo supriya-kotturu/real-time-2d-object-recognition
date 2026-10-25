@@ -7,7 +7,7 @@
 #include <opencv2/imgproc.hpp>
 #include <sstream>
 
-#include "app/capture.h"
+#include "app/dataset.h"
 #include "app/feature_db.h"
 #include "app/overlay.h"
 #include "app/roi.h"

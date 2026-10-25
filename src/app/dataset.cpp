@@ -27,3 +27,9 @@ std::vector<LabeledImage> listLabeledImages(const fs::path& root) {
     });
     return out;
 }
+
+bool isValidLabel(const std::string& label) {
+    return !label.empty() && label.size() <= 64 &&
+           std::all_of(label.begin(), label.end(),
+                       [](unsigned char c) { return std::isalnum(c) || c == '_' || c == '-'; });
+}

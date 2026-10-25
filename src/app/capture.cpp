@@ -28,9 +28,3 @@ void saveImage(const std::filesystem::path& dir, const std::string& file, const 
     std::filesystem::create_directories(dir);
     cv::imwrite((dir / file).string(), img);
 }
-
-bool isValidLabel(const std::string& label) {
-    return !label.empty() && label.size() <= 64 &&
-           std::all_of(label.begin(), label.end(),
-                       [](unsigned char c) { return std::isalnum(c) || c == '_' || c == '-'; });
-}
