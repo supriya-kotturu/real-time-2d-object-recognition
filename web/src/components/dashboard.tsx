@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDb } from "@/hooks/use-db";
 import { useStatus } from "@/hooks/use-status";
+import { useWasmModel } from "@/hooks/use-wasm-model";
 import { api, errorMessage, MODES, type Mode } from "@/lib/api";
 import { USE_WASM } from "@/lib/wasm-backend";
 
@@ -24,6 +25,18 @@ export function Dashboard() {
   const { db, refresh } = useDb(status?.dbSize);
   // The server owns the mode so every open tab agrees; the next poll reflects a change.
   const mode = status?.mode ?? "detect";
+
+  // Where ResNet18 runs in the browser build (D-29), visible in every mode without scrolling.
+  const model = useWasmModel();
+  const processor = !USE_WASM
+    ? null
+    : model.state === "ready"
+      ? model.backend === "webgpu"
+        ? "GPU"
+        : "CPU"
+      : model.state === "loading"
+        ? `ResNet18 ${Math.round(model.progress * 100)}%`
+        : null;
 
   const changeMode = (next: Mode) =>
     api.setMode(next).catch((err) => toast.error(errorMessage(err)));
@@ -55,7 +68,11 @@ export function Dashboard() {
             </TabsList>
           </Tabs>
           <Badge variant={connected ? "secondary" : "destructive"}>
-            {connected ? `connected · ${status?.fps.toFixed(1)} fps` : "server offline"}
+            {connected
+              ? `connected · ${status?.fps.toFixed(1)} fps${processor ? ` · ${processor}` : ""}`
+              : USE_WASM
+                ? "loading"
+                : "server offline"}
           </Badge>
         </div>
       </header>

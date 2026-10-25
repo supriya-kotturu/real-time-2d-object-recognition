@@ -385,3 +385,5 @@ Phone layout fine; back camera; trained "phone" with 3 samples in the browser; l
 
 **Problem (yours, on the phone):** the live feed looks laggy. Cause: the picture shown *was* the processed frame, so it refreshed at recognition speed (~3.6 fps with ResNet18 on desktop, slower on phones).
 **Chosen: A + B.** (A) show the camera directly and draw only the box/axis/label on top from the latest result: smooth video, overlay trails a moving object briefly. (B) run ResNet18 on WebGPU with a WebAssembly fallback. Rejected: embedding every Nth frame (stale labels; auto-learn could store stale embeddings).
+
+**D-29 on your phone (2026-10-25):** classifier card reports "Running on your GPU via WebGPU" on the deployed draft.
