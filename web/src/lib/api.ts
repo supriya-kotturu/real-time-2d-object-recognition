@@ -47,6 +47,7 @@ export interface Status {
   label: string;
   source: string;
   still: boolean;
+  browser: boolean; // server.exe --browser: frames come from this GUI's camera (D-24)
   dbSize: number;
   unknownThreshold: number;
   fps: number;
@@ -111,6 +112,9 @@ export const api = {
 };
 
 export const streamUrl = (view: View) => `${STREAM_ORIGIN}/stream?view=${view}`;
+
+// Next rewrites don't proxy WebSocket upgrades, so like the stream this goes straight to :8080.
+export const framesSocketUrl = `${STREAM_ORIGIN.replace(/^http/, "ws")}/ws/frames`;
 
 export const errorMessage = (err: unknown) =>
   err instanceof Error ? err.message : "Unexpected error";
