@@ -376,3 +376,7 @@ Fixes: demo protocol (object on paper, hands out of frame: the task's assumption
 - **Name:** Silhouette (your pick; mentor noted it undersells the ResNet18 half). Logo: a dark blob crossed by its primary axis.
 - **Theme:** dark by default, **Lab bench**: near-black ink, lime accent (= OBB box), blue (= primary axis). The video overlay uses the same colours with a dark halo so it reads on white paper (your contrast question).
 - **Storage:** samples a visitor trains survive a refresh: IndexedDB (the browser's built-in database), on their device only. Each sample = label + 5 features + 512-d embedding + a thumbnail of the **crop it learned from** (the ROI, region of interest). **Cap 50** (one auto-learn run = 5); a gallery lists them with delete-one / delete-label / clear-all; Train refuses when full.
+
+### Real-device test (2026-10-25 ~01:30, your phone, deployed draft)
+
+Phone layout fine; back camera; trained "phone" with 3 samples in the browser; left the site and came back: samples retained (IndexedDB); recognised the phone on a pale mint, patterned bedsheet, i.e. off the white-paper assumption, with ISODATA adapting to the background. Report material (extensions: GUI + browser deployment; T9 one-shot on a new object). Caveat to check: a sample whose crop is only the camera ring teaches the wrong shape; the gallery thumbnail shows it.
