@@ -12,8 +12,9 @@
 //   POST   /api/train                                  append current features under the label
 //   POST   /api/capture                                save raw + stage images (D-06)
 //   POST   /api/next                                   advance to the next still image
-//   PUT    /api/settings  {"unknownThreshold": 3.0}
+//   PUT    /api/settings  {"unknownThreshold": 3.0}   cutoff of the current metric
 //   PUT    /api/mode      {"mode": "detect"|"collect"|"evaluate"}       (D-15)
+//   PUT    /api/classifier {"classifier": "features"|"resnet18", "metric": "cosine"|"ssd"} (D-25)
 //   POST   /api/autolearn/label  {"label": "mug"}    name the prompted unknown object
 //   POST   /api/autolearn/dismiss                    ignore it until it leaves / stop collecting
 //   GET    /api/eval                                 live confusion matrix
@@ -38,6 +39,7 @@
 #include <future>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <opencv2/core/utils/logger.hpp>
@@ -48,6 +50,7 @@
 #include <thread>
 
 #include "app/auto_learn.h"
+#include "app/embedding.h"
 #include "app/capture.h"
 #include "app/feature_db.h"
 #include "app/frame_mailbox.h"
@@ -64,6 +67,8 @@ using namespace std::chrono_literals;
 namespace {
 
 const std::string kDbPath = "data/db/features.csv";
+const std::string kEmbedDbPath = "data/db/embeddings_resnet18.csv";  // per model (H-01)
+const std::string kModelPath = "data/models/resnet18-v2-7.onnx";
 const std::vector<std::string> kViews = {"annotated", "threshold", "regions"};
 // Morphology n and the min-area filter are in pixels, tuned on 640x480 captures (D-07, D-21),
 // so larger browser frames are scaled down to this width before the pipeline sees them.
@@ -251,9 +256,9 @@ int main(int argc, char** argv) {
 
     // --- Pipeline-thread state; only touched inside runOnPipeline commands or the loop. ---
     std::string label;
-    double unknownThreshold = 3.0;
     std::vector<orec::Sample> db = loadFeatureDb(kDbPath);
     std::vector<double> stdevs = orec::featureStdevs(db);
+    std::vector<orec::Sample> embedDb = loadFeatureDb(kEmbedDbPath);
     FrameResult result;
     cv::Mat frame, display, regionsVis;
     bool advance = true;
@@ -262,11 +267,50 @@ int main(int argc, char** argv) {
     orec::ConfusionMatrix liveMatrix;
     std::string currentPrediction;  // this frame's label, "unknown", or "" with no object
 
+    // D-25: classifier + metric chosen in the GUI. Each metric has its own scale, so each keeps
+    // its own unknown cutoff (defaults from eval's correct-match distances).
+    std::string classifier = "features";
+    std::string metric = "scaled-euclidean";
+    std::map<std::string, double> cutoffs = {
+        {"scaled-euclidean", 3.0}, {"cosine", 0.35}, {"ssd", 500.0}};
+
+    std::unique_ptr<Embedder> embedder;
+    if (fs::exists(kModelPath)) {
+        try {
+            embedder = std::make_unique<Embedder>(kModelPath);
+        } catch (const cv::Exception& e) {
+            std::cerr << "ResNet18 unavailable: " << e.what() << "\n";
+        }
+    }
+
+    // The current frame's embedding, computed at most once per frame and only when something
+    // asks for it, so features mode pays nothing for ResNet18.
+    std::vector<double> embedding;
+    bool embeddingFresh = false;
+    const auto currentEmbedding = [&]() -> const std::vector<double>* {
+        if (!embedder || !result.hasFeatures) return nullptr;
+        if (!embeddingFresh) {
+            cv::Mat roi;
+            if (!extractAlignedRoi(frame, result.regionMap, result.regions[result.primary].id,
+                                   result.features, roi))
+                return nullptr;
+            embedder->embed(roi, embedding);
+            embeddingFresh = true;
+        }
+        return &embedding;
+    };
+
     const auto addSample = [&](const std::string& name) {
         const orec::Sample sample{name, result.features.values};
         appendSample(kDbPath, sample);
         db.push_back(sample);
         stdevs = orec::featureStdevs(db);
+        // Both DBs grow together, so switching classifier never forgets what was just taught.
+        if (const auto* e = currentEmbedding()) {
+            const orec::Sample embedded{name, *e};
+            appendSample(kEmbedDbPath, embedded);
+            embedDb.push_back(embedded);
+        }
     };
 
     const auto matrixJson = [&] {
@@ -318,13 +362,21 @@ int main(int argc, char** argv) {
         R"(/api/db/([A-Za-z0-9_-]+))", [&](const httplib::Request& req, httplib::Response& res) {
             const std::string target = req.matches[1];
             sendJson(res, runOnPipeline(shared, [&, target] {
-                         const auto before = db.size();
-                         db.erase(std::remove_if(
-                                      db.begin(), db.end(),
-                                      [&](const orec::Sample& s) { return s.label == target; }),
-                                  db.end());
-                         if (db.size() == before) return Reply{404, jsonError("no such label")};
+                         const auto drop = [&](std::vector<orec::Sample>& from) {
+                             const auto before = from.size();
+                             from.erase(std::remove_if(from.begin(), from.end(),
+                                                       [&](const orec::Sample& s) {
+                                                           return s.label == target;
+                                                       }),
+                                        from.end());
+                             return from.size() != before;
+                         };
+                         const bool droppedFeatures = drop(db);
+                         const bool droppedEmbeddings = drop(embedDb);
+                         if (!droppedFeatures && !droppedEmbeddings)
+                             return Reply{404, jsonError("no such label")};
                          saveFeatureDb(kDbPath, db);
+                         saveFeatureDb(kEmbedDbPath, embedDb);
                          stdevs = orec::featureStdevs(db);
                          return Reply{200, dbJson()};
                      }));
@@ -378,8 +430,37 @@ int main(int argc, char** argv) {
             return;
         }
         sendJson(res, runOnPipeline(shared, [&, value] {
-                     unknownThreshold = value;
+                     cutoffs[metric] = value;  // applies to the metric currently selected
                      return Reply{200, cv::format(R"({"unknownThreshold":%.3f})", value)};
+                 }));
+    });
+
+    http.Put("/api/classifier", [&](const httplib::Request& req, httplib::Response& res) {
+        std::string nextClassifier, nextMetric;
+        if (!extractString(req.body, "classifier", nextClassifier) ||
+            (nextClassifier != "features" && nextClassifier != "resnet18")) {
+            sendJson(res, {400, jsonError("classifier must be features or resnet18")});
+            return;
+        }
+        const bool hasMetric = extractString(req.body, "metric", nextMetric);
+        if (!hasMetric) nextMetric = nextClassifier == "resnet18" ? "cosine" : "scaled-euclidean";
+        const bool valid = nextClassifier == "features"
+                               ? nextMetric == "scaled-euclidean"
+                               : nextMetric == "cosine" || nextMetric == "ssd";
+        if (!valid) {
+            sendJson(res, {400, jsonError("features uses scaled-euclidean; resnet18 uses cosine "
+                                          "or ssd")});
+            return;
+        }
+        sendJson(res, runOnPipeline(shared, [&, nextClassifier, nextMetric] {
+                     if (nextClassifier == "resnet18" && !embedder)
+                         return Reply{409, jsonError("ResNet18 model not found at " + kModelPath)};
+                     classifier = nextClassifier;
+                     metric = nextMetric;
+                     // A prompt raised under the other classifier's notion of "unknown" is stale.
+                     autoLearn = AutoLearn{};
+                     return Reply{200, R"({"classifier":")" + classifier + R"(","metric":")" +
+                                           metric + "\"}"};
                  }));
     });
 
@@ -481,7 +562,10 @@ int main(int argc, char** argv) {
                << R"(,"label":")" << jsonEscape(label) << R"(","source":")"
                << jsonEscape(sourceName()) << R"(","still":)" << (isStill() ? "true" : "false")
                << R"(,"browser":)" << (browser ? "true" : "false") << R"(,"dbSize":)" << db.size()
-               << R"(,"unknownThreshold":)" << unknownThreshold << R"(,"fps":)"
+               << R"(,"embedDbSize":)" << embedDb.size() << R"(,"classifier":")" << classifier
+               << R"(","metric":")" << metric << R"(","resnetAvailable":)"
+               << (embedder ? "true" : "false") << R"(,"unknownThreshold":)" << cutoffs[metric]
+               << R"(,"fps":)"
                << cv::format("%.1f", fps) << R"(,"autoLearn":{"state":")"
                << toString(autoLearn.state()) << R"(","progress":)"
                << cv::format("%.2f", autoLearn.holdProgress(frameTime)) << R"(,"label":")"
@@ -535,15 +619,25 @@ int main(int argc, char** argv) {
         if (frame.empty()) break;
 
         runPipeline(frame, result);
+        embeddingFresh = false;
         frame.copyTo(display);
         colorizeRegions(result.regionMap, regionsVis);
         frameTime = AutoLearn::Clock::now();
 
         // Classify once per frame; status, auto-learn, and evaluation all reuse it.
-        canClassify = result.hasFeatures && db.size() >= 2;
         match = orec::Match{};
-        if (canClassify)
-            match = orec::classifyNearest(db, stdevs, result.features.values, unknownThreshold);
+        const double cutoff = cutoffs[metric];
+        if (classifier == "resnet18") {
+            const auto* e = currentEmbedding();
+            canClassify = e && embedDb.size() >= 2;
+            if (canClassify)
+                match = metric == "ssd" ? orec::classifySsd(embedDb, *e, cutoff)
+                                        : orec::classifyCosine(embedDb, *e, cutoff);
+        } else {
+            canClassify = result.hasFeatures && db.size() >= 2;
+            if (canClassify)
+                match = orec::classifyNearest(db, stdevs, result.features.values, cutoff);
+        }
         // With fewer than 2 samples nothing can be recognised, so every object counts as
         // unknown: that is what lets auto-learn bootstrap an empty DB.
         const bool unknown = result.hasFeatures && (!canClassify || !match.known);
