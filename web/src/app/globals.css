@@ -168,6 +168,21 @@
   .dashboard-column {
     @apply flex min-w-0 flex-col gap-6;
   }
+  .dashboard-main {
+    @apply lg:col-start-1 lg:row-start-1;
+  }
+  .dashboard-side {
+    @apply lg:col-start-2 lg:row-span-2 lg:row-start-1;
+  }
+  .dashboard-extra {
+    @apply lg:col-start-1 lg:row-start-2;
+  }
+  .dashboard-pipeline {
+    @apply max-sm:hidden;
+  }
+  .feature-meaning {
+    @apply max-sm:hidden;
+  }
 
   .stream-header {
     @apply flex flex-wrap items-center justify-between gap-3;

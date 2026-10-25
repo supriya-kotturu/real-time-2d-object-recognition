@@ -36,7 +36,11 @@ export function Dashboard() {
           <div>
             <h1 className="dashboard-title">Silhouette</h1>
             <p className="dashboard-subtitle">
-              See the shape, name the thing · threshold → clean → regions → features → nearest neighbour
+              See the shape, name the thing
+              <span className="dashboard-pipeline">
+                {" "}
+                · threshold → clean → regions → features → nearest neighbour
+              </span>
             </p>
           </div>
         </div>
@@ -57,11 +61,12 @@ export function Dashboard() {
       </header>
 
       <div className="dashboard-grid">
-        <section className="dashboard-column">
+        {/* Three areas so a phone stacks camera → prediction/controls → feature table: the answer
+            sits right under the camera. On wide screens the side column spans both rows. */}
+        <section className="dashboard-column dashboard-main">
           <StreamViewer status={status} connected={connected} />
-          <FeaturesCard object={status?.object ?? null} />
         </section>
-        <aside className="dashboard-column">
+        <aside className="dashboard-column dashboard-side">
           {mode === "detect" && (
             <>
               <PredictionCard status={status} />
@@ -84,6 +89,9 @@ export function Dashboard() {
             </>
           )}
         </aside>
+        <section className="dashboard-column dashboard-extra">
+          <FeaturesCard object={status?.object ?? null} />
+        </section>
       </div>
     </main>
   );

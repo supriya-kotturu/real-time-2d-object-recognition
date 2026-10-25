@@ -24,7 +24,7 @@ export function FeaturesCard({ object }: { object: DetectedObject | null }) {
             <TableHeader>
               <TableRow>
                 <TableHead>Feature</TableHead>
-                <TableHead>Meaning</TableHead>
+                <TableHead className="feature-meaning">Meaning</TableHead>
                 <TableHead className="feature-value">Value</TableHead>
               </TableRow>
             </TableHeader>
@@ -32,7 +32,9 @@ export function FeaturesCard({ object }: { object: DetectedObject | null }) {
               {Object.entries(object.features).map(([name, value]) => (
                 <TableRow key={name}>
                   <TableCell className="font-medium">{name}</TableCell>
-                  <TableCell className="text-muted-foreground">{DESCRIPTIONS[name] ?? ""}</TableCell>
+                  <TableCell className="feature-meaning text-muted-foreground">
+                    {DESCRIPTIONS[name] ?? ""}
+                  </TableCell>
                   <TableCell className="feature-value">{value.toPrecision(4)}</TableCell>
                 </TableRow>
               ))}

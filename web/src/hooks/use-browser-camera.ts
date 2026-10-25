@@ -127,9 +127,13 @@ export function useBrowserCamera() {
       }
       try {
         const size = { width: { ideal: 640 }, height: { ideal: 480 } };
+        // Phones default to the selfie camera; pointing down at paper needs the back one.
+        // "ideal" so laptops with only a front camera still get it.
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
-          video: requested ? { ...size, deviceId: { exact: requested } } : size,
+          video: requested
+            ? { ...size, deviceId: { exact: requested } }
+            : { ...size, facingMode: { ideal: "environment" } },
         });
         if (gen !== generation.current) {
           stream.getTracks().forEach((t) => t.stop());
