@@ -178,6 +178,9 @@
   .stream-overlay-solid {
     @apply bg-muted;
   }
+  .camera-source {
+    @apply inline-flex gap-1;
+  }
   .camera-controls {
     @apply flex flex-wrap items-center gap-2;
   }

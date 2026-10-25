@@ -2,6 +2,8 @@
 
 // Rewrite proxies may buffer multipart responses, so <img> loads the stream straight from
 // the C++ server instead of through Next.
+// The static export served by server.exe --public (D-26) builds with this set to "", making
+// every URL same-origin.
 export const STREAM_ORIGIN = process.env.NEXT_PUBLIC_STREAM_ORIGIN ?? "http://127.0.0.1:8080";
 
 export type View = "annotated" | "threshold" | "regions";
@@ -80,6 +82,7 @@ export interface Status {
   source: string;
   still: boolean;
   browser: boolean; // server.exe --browser: frames come from this GUI's camera (D-24)
+  public: boolean; // hosted demo: DB changes are in memory only, Capture is off (D-26)
   dbSize: number;
   unknownThreshold: number;
   fps: number;
@@ -123,6 +126,7 @@ export const api = {
   setLabel: (label: string) =>
     request<{ label: string }>("/api/label", { method: "POST", body: JSON.stringify({ label }) }),
   train: () => request<DbSummary>("/api/train", { method: "POST" }),
+  resetDb: () => request<DbSummary>("/api/db/reset", { method: "POST" }),
   capture: () => request<{ saved: string }>("/api/capture", { method: "POST" }),
   next: () => request<object>("/api/next", { method: "POST" }),
   setClassifier: (classifier: Classifier, metric?: Metric) =>
@@ -151,7 +155,11 @@ export const api = {
 export const streamUrl = (view: View) => `${STREAM_ORIGIN}/stream?view=${view}`;
 
 // Next rewrites don't proxy WebSocket upgrades, so like the stream this goes straight to :8080.
-export const framesSocketUrl = `${STREAM_ORIGIN.replace(/^http/, "ws")}/ws/frames`;
+// Same-origin builds derive it from the page, so https pages get wss.
+export const framesSocketUrl = () => {
+  const origin = STREAM_ORIGIN || window.location.origin;
+  return `${origin.replace(/^http/, "ws")}/ws/frames`;
+};
 
 export const errorMessage = (err: unknown) =>
   err instanceof Error ? err.message : "Unexpected error";

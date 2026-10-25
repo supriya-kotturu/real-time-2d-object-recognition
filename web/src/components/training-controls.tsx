@@ -84,13 +84,15 @@ export function TrainingControls({ status, onTrained }: TrainingControlsProps) {
           >
             <GraduationCap /> Train
           </Button>
-          <Button
-            variant="outline"
-            disabled={!hasLabel || busy}
-            onClick={() => run(async () => `Saved ${(await api.capture()).saved}`)}
-          >
-            <Camera /> Capture
-          </Button>
+          {!status?.public && (
+            <Button
+              variant="outline"
+              disabled={!hasLabel || busy}
+              onClick={() => run(async () => `Saved ${(await api.capture()).saved}`)}
+            >
+              <Camera /> Capture
+            </Button>
+          )}
         </div>
         {status?.still && (
           <Button

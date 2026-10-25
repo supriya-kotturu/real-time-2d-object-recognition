@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBrowserCamera } from "@/hooks/use-browser-camera";
-import { streamUrl, VIEWS, type Status, type View } from "@/lib/api";
+import { STREAM_ORIGIN, streamUrl, VIEWS, type Status, type View } from "@/lib/api";
 
 interface StreamViewerProps {
   status: Status | null;
@@ -21,10 +21,11 @@ export function StreamViewer({ status, connected }: StreamViewerProps) {
   const browserSource = connected && status?.browser;
 
   let overlay: string | null = null;
-  if (!connected) overlay = "Waiting for server.exe on 127.0.0.1:8080…";
+  if (!connected) overlay = `Waiting for server.exe${STREAM_ORIGIN ? ` on ${STREAM_ORIGIN}` : ""}…`;
   else if (browserSource && camera.phase === "error") overlay = camera.error;
   else if (browserSource && camera.phase !== "live")
-    overlay = "Press Start camera. Your browser will ask for permission; point the camera down at the paper.";
+    overlay =
+      "Start camera (your browser asks for permission; point it down at the paper), or play the held-out sample images.";
 
   return (
     <Card>

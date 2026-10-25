@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,21 @@ import { api, errorMessage, type DbSummary } from "@/lib/api";
 interface DatabaseCardProps {
   db: DbSummary | null;
   onChanged: () => void;
+  publicDemo?: boolean;
 }
 
-export function DatabaseCard({ db, onChanged }: DatabaseCardProps) {
+export function DatabaseCard({ db, onChanged, publicDemo }: DatabaseCardProps) {
+  // Public demo only: visitors' changes live in memory, and this restores the committed DB.
+  const reset = async () => {
+    try {
+      await api.resetDb();
+      onChanged();
+      toast.success("Database reset to the original training set");
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  };
+
   const remove = async (label: string, count: number) => {
     if (!window.confirm(`Delete all ${count} "${label}" samples?`)) return;
     try {
@@ -62,6 +74,11 @@ export function DatabaseCard({ db, onChanged }: DatabaseCardProps) {
           </Table>
         ) : (
           <p className="empty-state">No samples yet: set a label and press Train</p>
+        )}
+        {publicDemo && (
+          <Button variant="outline" size="sm" className="mt-3" onClick={reset}>
+            <RotateCcw /> Reset DB
+          </Button>
         )}
       </CardContent>
     </Card>

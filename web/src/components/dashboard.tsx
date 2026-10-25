@@ -64,7 +64,7 @@ export function Dashboard() {
           {mode === "collect" && (
             <>
               <TrainingControls status={status} onTrained={refresh} />
-              <DatabaseCard db={db} onChanged={refresh} />
+              <DatabaseCard db={db} onChanged={refresh} publicDemo={status?.public} />
             </>
           )}
           {mode === "evaluate" && (
