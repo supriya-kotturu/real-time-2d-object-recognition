@@ -1,6 +1,7 @@
 // HTTP backend for the web GUI (D-13). Runs the same pipeline as live, but instead of OpenCV
 // windows it serves MJPEG streams and a small JSON API on 127.0.0.1.
-// Usage: server [--browser | camera-index | video-file | stream-url | image-dir] [port]
+// Usage: server [--public] [--allow-origin host]... [--browser | camera-index | video-file |
+//               stream-url | image-dir] [port]
 //        (default: --browser 8080). --browser = frames pushed by the GUI's camera (D-24).
 //
 //   WS     /ws/frames                                  binary JPEG in, {"ok":true} ack out
@@ -155,14 +156,29 @@ void sendJson(httplib::Response& res, const Reply& reply) {
 // origin is let through; requests without Origin (curl, <img> stream loads) are not cross-site.
 // Same-origin also passes: in --public mode this server serves the GUI itself (D-26), so the
 // page's Origin host equals the Host it sends, behind any TLS-terminating proxy.
-bool isAllowedOrigin(const httplib::Request& req) {
+// --allow-origin adds a GUI hosted elsewhere (the Netlify frontend, D-26), over https only,
+// including its "<branch>--" deploy subdomains.
+bool isAllowedOrigin(const httplib::Request& req, const std::vector<std::string>& extraHosts) {
     if (!req.has_header("Origin")) return true;
     const std::string origin = req.get_header_value("Origin");
     static const std::regex local(R"(^http://(localhost|127\.0\.0\.1)(:[0-9]{1,5})?$)");
     if (std::regex_match(origin, local)) return true;
     static const std::regex scheme(R"(^https?://)");
-    return req.has_header("Host") &&
-           std::regex_replace(origin, scheme, "") == req.get_header_value("Host");
+    if (req.has_header("Host") &&
+        std::regex_replace(origin, scheme, "") == req.get_header_value("Host"))
+        return true;
+    const std::string prefix = "https://";
+    if (origin.rfind(prefix, 0) != 0) return false;
+    const std::string originHost = origin.substr(prefix.size());
+    static const std::regex branchLabel(R"(^[a-z0-9-]+--$)");
+    for (const auto& h : extraHosts) {
+        if (originHost == h) return true;
+        if (originHost.size() > h.size() &&
+            originHost.compare(originHost.size() - h.size(), h.size(), h) == 0 &&
+            std::regex_match(originHost.substr(0, originHost.size() - h.size()), branchLabel))
+            return true;
+    }
+    return false;
 }
 
 }  // namespace
@@ -174,11 +190,13 @@ int main(int argc, char** argv) {
     // memory only (the committed DB is never modified), disables Capture (it writes images),
     // and serves the static GUI from web/out so page, API and WebSocket share one origin.
     bool isPublic = false;
-    std::vector<std::string> positional;
+    std::vector<std::string> positional, allowedHosts;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "--public")
             isPublic = true;
+        else if (arg == "--allow-origin" && i + 1 < argc)
+            allowedHosts.push_back(argv[++i]);
         else
             positional.push_back(arg);
     }
@@ -205,8 +223,8 @@ int main(int argc, char** argv) {
     if (fs::is_directory("web/out")) http.set_mount_point("/", "web/out");
 
     // Runs before routing and before WebSocket upgrades.
-    http.set_pre_routing_handler([](const httplib::Request& req, httplib::Response& res) {
-        if (isAllowedOrigin(req)) return httplib::Server::HandlerResponse::Unhandled;
+    http.set_pre_routing_handler([&](const httplib::Request& req, httplib::Response& res) {
+        if (isAllowedOrigin(req, allowedHosts)) return httplib::Server::HandlerResponse::Unhandled;
         sendJson(res, {403, jsonError("origin not allowed")});
         return httplib::Server::HandlerResponse::Handled;
     });
@@ -316,6 +334,12 @@ int main(int argc, char** argv) {
         } catch (const cv::Exception& e) {
             std::cerr << "ResNet18 unavailable: " << e.what() << "\n";
         }
+    }
+    // The public demo opens on the method that recognises the samples (47/47 vs 26/47 on the
+    // T7 split); visitors can still switch to hand features to compare.
+    if (isPublic && embedder) {
+        classifier = "resnet18";
+        metric = "cosine";
     }
 
     // The current frame's embedding, computed at most once per frame and only when something
