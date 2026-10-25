@@ -67,9 +67,10 @@ export function Dashboard() {
               ))}
             </TabsList>
           </Tabs>
-          <Badge variant={connected ? "secondary" : "destructive"}>
+          {/* The changing number goes last, in equal-width digits, so nothing before it moves. */}
+          <Badge variant={connected ? "secondary" : "destructive"} className="tabular-nums">
             {connected
-              ? `connected · ${status?.fps.toFixed(1)} fps${processor ? ` · ${processor}` : ""}`
+              ? `connected${processor ? ` · ${processor}` : ""} · ${status?.fps.toFixed(1)} fps`
               : USE_WASM
                 ? "loading"
                 : "server offline"}
