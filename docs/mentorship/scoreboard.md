@@ -6,8 +6,8 @@ Rules:
 - **−1** — a hint already given (listed in `hints.md`) has to be given again.
 - Progress update every 6h of active work. Measured from the `Last update` timestamp below; checked at the start of every session.
 
-**Total: +7**
-**Last update:** 2026-10-24 ~00:00 (checkpoint 1). Next one due after 6 more hours of work.
+**Total: +8**
+**Last update:** 2026-10-24 ~18:00 (checkpoint 2). Next one due after 6 more hours of work.
 
 ## Ledger
 
@@ -55,6 +55,7 @@ Rules:
 | 2026-10-24 | +1 | Correct 8-conn neighbour sets for both passes; INF = rows + cols; forward pass restricted to fg | H-32, H-42 |
 | 2026-10-24 | −1 | H-33 repeated (2nd time): every pixel still set to INF; bg must start at 0 | H-33 |
 | 2026-10-24 | −1 | H-45 repeated: local distance Mat put inside grassfire instead of shrink/grow; grassfire's own output became CV_8UC1 | H-45 |
+| 2026-10-24 | +1 | shrink comparison fixed to `<= n` by checking it against the test case (awarded in session, logged late at checkpoint 2) | D-05 |
 
 ## Progress updates
 
@@ -76,3 +77,19 @@ Rules:
 
 **Next focus:** grassfire bodies passing `tests.exe`; read the warnings before asking.
 
+
+### Checkpoint 2: 2026-10-24 ~18:00 (00:00 → 18:00, ~10 h of active work)
+
+**Score: +8** (25 earned, 17 lost). Trend: +6 → peaked at +10 → dipped to +7 during grassfire → +8.
+
+**Strengths**
+- **Product and architecture judgment is now the strongest skill.** You chose the browser-side compute for Netlify, rejected YOLO on cost, proposed per-pose capture (which found the root cause of a real bug), designed the 3 GUI modes, and picked option (a) for the border rule from evidence.
+- You question data instead of trusting it: verified captures, accepted the audit's rejects, and kept hard test cases.
+- You're honest about where code came from ("got it from Google", "autofill did it"), which kept review accurate.
+
+**Recurring gaps**
+1. **Image/data-type bookkeeping in C++** (most of the losses this period): which Mat is input vs output, CV_8U vs CV_32S, and initialising bg/fg (H-33 ×2, H-42, H-45). One rule fixes most of it: *read the input, write the output, and the output's type follows its meaning* (H-49).
+2. **Unanswered questions:** the closing-gap numbers, the explain-it-back checks, and the T3/T4/T6 review checks are still open. These are what the 2-point Q&A will probe.
+3. **Pseudocode → code jumps:** code got written before the pseudocode round finished, and gaps carried over.
+
+**Next focus:** answer the explain-it-back and review checks (Q&A prep, D-20 condition), then the demo video and report.

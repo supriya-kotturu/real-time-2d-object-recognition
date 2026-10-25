@@ -30,6 +30,8 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 | D-21 | 2026-10-24 | T2 cleanup parameters | you | proposed: close 2 / open 1, 8-conn |
 | D-22 | 2026-10-24 | Saturation pre-processing for coloured objects | AGENT | decided, built (option C) |
 | D-23 | 2026-10-24 | First evaluation results (T7 + T9) | — | recorded |
+| D-24 | 2026-10-24 | Browser camera (getUserMedia) for the local GUI now | AGENT (you architect) | decided: build now; design questions open |
+| D-25 | 2026-10-24 | GUI classifier toggle: hand features vs ResNet18 embedding | AGENT | proposed; awaiting confirmation |
 | D-05 | 2026-10-23 | Headless tests + 4/8-conn visual dump for from-scratch stages | AGENT harness, HAND expected values | decided |
 
 ---
@@ -302,3 +304,13 @@ Data: 58 training images (10 labels) in `data/objects/`; 37 usable test images (
 | leave-one-out over data/objects | 32/58 = 55.2% | 57/58 = 98.3% |
 
 **Reading:** distinct silhouettes (toy-car, sticky-notes, notebook, mouse) are recognised; the blob-like objects (ball, batteries, cloud, towel) are not. Ball → sticky-notes 4/6: disc and square both lack a defined least-moment axis, so their OBB features coincide. The embedding wins because it sees colour and texture, which the 5 shape features ignore by design. Matrices: `out/eval/confusion_*_{split,split-one-shot,loo}.md`.
+
+## D-24 — Browser camera for the local GUI (decided 2026-10-24 ~18:00: "we need it now")
+
+**Constraint found:** `getUserMedia` only runs on secure contexts (`localhost` or HTTPS). Laptop webcam on `localhost:3000` works but faces the user, not down at the paper. Phone browser → `http://<laptop-ip>:3000` is blocked (not a secure context), and server.exe binds 127.0.0.1 only (D-13).
+**Proposed design:** browser `getUserMedia` → `<video>` → canvas → JPEG → `POST /api/frame` (binary, ~10 fps, latest-frame-wins, drop stale) → server.exe "push" source (new `--browser` mode, a FrameSource alternative with a single-slot mailbox) → same pipeline → existing MJPEG/status. A camera picker (`enumerateDevices`) lets an external/USB webcam be chosen.
+**Open questions for you (ask first in the next session):** (1) which camera: laptop webcam, a USB webcam, or the phone's browser (that needs HTTPS: a self-signed/mkcert cert plus binding server.exe beyond loopback, both of which weaken D-13's security)? (2) WebSocket vs POST per frame? (3) Keep IP Webcam as an alternative source?
+
+## D-25 — Classifier toggle in the GUI (proposed)
+
+Toggle features | embedding (ResNet18) in the GUI. Embedding DB per model (H-01): `data/db/embeddings_resnet18.csv` built by `train --embed`. Separate unknown cutoff per method (cosine 0–2 vs scaled Euclidean). Train/Collect/auto-learn append to both DBs. Compute embeddings only when needed (or every frame for instant switching, at an fps cost). Suits T8 ("classical, embedding, or both"). You asked about it; not confirmed yet.
