@@ -70,6 +70,7 @@ export function Dashboard() {
           {mode === "evaluate" && (
             <>
               <PredictionCard status={status} />
+              <SettingsCard status={status} />
               <EvaluateCard status={status} />
             </>
           )}

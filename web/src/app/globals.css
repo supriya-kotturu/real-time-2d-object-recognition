@@ -181,7 +181,8 @@
   .camera-controls {
     @apply flex flex-wrap items-center gap-2;
   }
-  .camera-select {
+  .camera-select,
+  .setting-select {
     @apply h-7 max-w-64 truncate rounded-md border border-input bg-background px-2 text-xs;
   }
   .stream-meta {

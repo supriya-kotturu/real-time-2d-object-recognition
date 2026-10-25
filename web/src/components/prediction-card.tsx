@@ -1,10 +1,14 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Status } from "@/lib/api";
+import { formatDistance } from "@/components/settings-card";
+import { CLASSIFIERS, metricInfo, type Status } from "@/lib/api";
 
 export function PredictionCard({ status }: { status: Status | null }) {
   const object = status?.object ?? null;
   const prediction = object?.prediction ?? null;
+
+  const metric = status?.metric ?? "scaled-euclidean";
+  const method = CLASSIFIERS.find((c) => c.value === (status?.classifier ?? "features"))!.label;
 
   let body: React.ReactNode;
   if (!object) {
@@ -24,8 +28,8 @@ export function PredictionCard({ status }: { status: Status | null }) {
           </Badge>
         </div>
         <p className="prediction-detail">
-          nearest: {prediction.label} · distance {prediction.distance.toFixed(2)} / cutoff{" "}
-          {status?.unknownThreshold.toFixed(1)}
+          nearest: {prediction.label} · distance {formatDistance(prediction.distance, metric)} /
+          cutoff {formatDistance(status?.unknownThreshold ?? 0, metric)}
         </p>
       </div>
     );
@@ -35,7 +39,9 @@ export function PredictionCard({ status }: { status: Status | null }) {
     <Card>
       <CardHeader>
         <CardTitle>Prediction</CardTitle>
-        <CardDescription>Nearest neighbour, scaled Euclidean</CardDescription>
+        <CardDescription>
+          {method}, {metricInfo(metric).label.toLowerCase()}
+        </CardDescription>
       </CardHeader>
       <CardContent>{body}</CardContent>
     </Card>

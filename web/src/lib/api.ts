@@ -40,8 +40,40 @@ export interface AutoLearnStatus {
   phase: "move" | "hold"; // while collecting: waiting for a new pose vs settling on one
 }
 
+export type Classifier = "features" | "resnet18";
+export type Metric = "scaled-euclidean" | "cosine" | "ssd";
+
+// D-25: which metrics each classifier offers; the first is its default. Slider ranges follow
+// each metric's scale (eval's correct-match distances), since one range can't fit all three.
+export const CLASSIFIERS: {
+  value: Classifier;
+  label: string;
+  metrics: { value: Metric; label: string; min: number; max: number; step: number }[];
+}[] = [
+  {
+    value: "features",
+    label: "Hand features",
+    metrics: [{ value: "scaled-euclidean", label: "Scaled Euclidean", min: 0.5, max: 10, step: 0.1 }],
+  },
+  {
+    value: "resnet18",
+    label: "ResNet18 embedding",
+    metrics: [
+      { value: "cosine", label: "Cosine distance", min: 0.05, max: 1, step: 0.01 },
+      { value: "ssd", label: "Sum of squared differences", min: 50, max: 1000, step: 10 },
+    ],
+  },
+];
+
+export const metricInfo = (metric: Metric) =>
+  CLASSIFIERS.flatMap((c) => c.metrics).find((m) => m.value === metric)!;
+
 export interface Status {
   mode: Mode;
+  classifier: Classifier;
+  metric: Metric;
+  resnetAvailable: boolean;
+  embedDbSize: number;
   autoLearn: AutoLearnStatus;
   threshold: number;
   label: string;
@@ -93,6 +125,11 @@ export const api = {
   train: () => request<DbSummary>("/api/train", { method: "POST" }),
   capture: () => request<{ saved: string }>("/api/capture", { method: "POST" }),
   next: () => request<object>("/api/next", { method: "POST" }),
+  setClassifier: (classifier: Classifier, metric?: Metric) =>
+    request<{ classifier: Classifier; metric: Metric }>("/api/classifier", {
+      method: "PUT",
+      body: JSON.stringify(metric ? { classifier, metric } : { classifier }),
+    }),
   setMode: (mode: Mode) =>
     request<{ mode: Mode }>("/api/mode", { method: "PUT", body: JSON.stringify({ mode }) }),
   autoLearnLabel: (label: string) =>
