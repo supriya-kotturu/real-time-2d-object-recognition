@@ -48,6 +48,8 @@ export function useBrowserCamera() {
   const [sentFps, setSentFps] = useState(0);
   const [kind, setKind] = useState<FrameSourceKind>("camera");
   const [sampleLabel, setSampleLabel] = useState<string | null>(null);
+  // The live stream, so the GUI can show it directly instead of the processed frames (D-29).
+  const [stream, setStream] = useState<MediaStream | null>(null);
 
   // Each start bumps the generation; a loop whose generation is stale stops itself, so a
   // quick stop → start never leaves two loops sending (H-04).
@@ -59,6 +61,7 @@ export function useBrowserCamera() {
     session.current?.sink?.close();
     session.current?.stream?.getTracks().forEach((t) => t.stop());
     session.current = null;
+    setStream(null);
   }, []);
 
   const stop = useCallback(() => {
@@ -140,6 +143,7 @@ export function useBrowserCamera() {
           return;
         }
         session.current = { stream, sink: null };
+        setStream(stream);
         const track = stream.getVideoTracks()[0];
         track.onended = () => fail(new Error("Camera disconnected"));
 
@@ -194,5 +198,17 @@ export function useBrowserCamera() {
 
   useEffect(() => teardown, [teardown]);
 
-  return { phase, error, devices, deviceId, sentFps, kind, sampleLabel, start, startSamples, stop };
+  return {
+    phase,
+    error,
+    devices,
+    deviceId,
+    sentFps,
+    kind,
+    sampleLabel,
+    stream,
+    start,
+    startSamples,
+    stop,
+  };
 }

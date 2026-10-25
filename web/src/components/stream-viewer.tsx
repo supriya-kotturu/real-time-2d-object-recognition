@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { CameraControls } from "@/components/camera-controls";
+import { LiveCamera } from "@/components/live-camera";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -38,11 +39,17 @@ export function StreamViewer({ status, connected }: StreamViewerProps) {
   // Lives here, not in a mode panel, so switching Detect/Collect/Evaluate keeps the camera on.
   const camera = useBrowserCamera();
   const browserSource = connected && status?.browser;
+  // Live camera + drawn overlay for the annotated view (D-29). Samples are still images, and
+  // the threshold/regions views are processed images by definition, so those stay as before.
+  const liveStream =
+    USE_WASM && view === "annotated" && camera.kind === "camera" && camera.phase === "live"
+      ? camera.stream
+      : null;
 
-  const selectView = (next: View) => {
-    setView(next);
-    wasmBackend.view = next; // applies from the next frame
-  };
+  // Tells the worker which image to send back with each frame (none while the GUI draws).
+  useEffect(() => {
+    wasmBackend.view = liveStream ? null : view;
+  }, [liveStream, view]);
 
   let overlay: string | null = null;
   if (!connected)
@@ -58,7 +65,7 @@ export function StreamViewer({ status, connected }: StreamViewerProps) {
     <Card>
       <CardHeader className="stream-header">
         <CardTitle>Camera</CardTitle>
-        <Tabs value={view} onValueChange={(v) => selectView(v as View)}>
+        <Tabs value={view} onValueChange={(v) => setView(v as View)}>
           <TabsList>
             {VIEWS.map((v) => (
               <TabsTrigger key={v.value} value={v.value}>
@@ -72,7 +79,9 @@ export function StreamViewer({ status, connected }: StreamViewerProps) {
         {browserSource && <CameraControls camera={camera} />}
         <div className="stream-frame">
           {connected &&
-            (USE_WASM ? (
+            (liveStream ? (
+              <LiveCamera stream={liveStream} />
+            ) : USE_WASM ? (
               <WasmCanvas />
             ) : (
               // Keyed on view so switching tabs opens a fresh multipart connection; remounts

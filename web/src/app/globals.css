@@ -199,6 +199,43 @@
   .stream-overlay {
     @apply absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground;
   }
+  /* D-29 overlay on the live camera: same lime/blue and dark halo as the C++ drawing. */
+  .live-overlay {
+    @apply pointer-events-none;
+  }
+  .overlay-halo {
+    fill: none;
+    stroke: #0c0f0b;
+    stroke-width: 5px;
+    vector-effect: non-scaling-stroke;
+    stroke-linejoin: round;
+  }
+  .overlay-box {
+    fill: none;
+    stroke: #7cff6b;
+    stroke-width: 2px;
+    vector-effect: non-scaling-stroke;
+    stroke-linejoin: round;
+  }
+  .overlay-axis {
+    fill: none;
+    stroke: #4d8dff;
+    stroke-width: 2px;
+    vector-effect: non-scaling-stroke;
+  }
+  .overlay-dot {
+    fill: #7cff6b;
+    stroke: #0c0f0b;
+    stroke-width: 2px;
+    vector-effect: non-scaling-stroke;
+  }
+  .overlay-text {
+    fill: #7cff6b;
+    stroke: #0c0f0b;
+    stroke-width: 4px;
+    paint-order: stroke;
+    font: 600 18px var(--font-sans), sans-serif;
+  }
   .stream-overlay-solid {
     @apply bg-muted;
   }

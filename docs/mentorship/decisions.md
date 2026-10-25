@@ -380,3 +380,8 @@ Fixes: demo protocol (object on paper, hands out of frame: the task's assumption
 ### Real-device test (2026-10-25 ~01:30, your phone, deployed draft)
 
 Phone layout fine; back camera; trained "phone" with 3 samples in the browser; left the site and came back: samples retained (IndexedDB); recognised the phone on a pale mint, patterned bedsheet, i.e. off the white-paper assumption, with ISODATA adapting to the background. Report material (extensions: GUI + browser deployment; T9 one-shot on a new object). Caveat to check: a sample whose crop is only the camera ring teaches the wrong shape; the gallery thumbnail shows it.
+
+## D-29 — Smooth live view + ResNet18 on the GPU (decided 2026-10-25)
+
+**Problem (yours, on the phone):** the live feed looks laggy. Cause: the picture shown *was* the processed frame, so it refreshed at recognition speed (~3.6 fps with ResNet18 on desktop, slower on phones).
+**Chosen: A + B.** (A) show the camera directly and draw only the box/axis/label on top from the latest result: smooth video, overlay trails a moving object briefly. (B) run ResNet18 on WebGPU with a WebAssembly fallback. Rejected: embedding every Nth frame (stale labels; auto-learn could store stale embeddings).

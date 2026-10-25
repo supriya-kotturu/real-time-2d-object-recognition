@@ -198,16 +198,24 @@ async function loadModel() {
     // Single-threaded wasm: threads would need cross-origin isolation (COOP/COEP, H-09).
     ort.env.wasm.numThreads = 1;
     ort.env.wasm.wasmPaths = "/ort/";
-    const loaded = await ort.InferenceSession.create(declareEmbeddingOutput(bytes), {
-      executionProviders: ["wasm"],
-    });
+    const model = declareEmbeddingOutput(bytes);
+    // D-29: the GPU where the browser offers WebGPU (several times faster), else WebAssembly.
+    let backend: "webgpu" | "wasm" = "webgpu";
+    let loaded: ort.InferenceSession;
+    try {
+      if (!("gpu" in navigator)) throw new Error("no WebGPU");
+      loaded = await ort.InferenceSession.create(model, { executionProviders: ["webgpu"] });
+    } catch {
+      backend = "wasm";
+      loaded = await ort.InferenceSession.create(model, { executionProviders: ["wasm"] });
+    }
     // The switch goes through the queue so it never lands between a frame's process and
     // finish; the download above runs alongside frames.
     queue = queue.then(() => {
       session = loaded;
       M._orec_set_embedding_available(1);
       command("setClassifier", "resnet18", "cosine");
-      report({ state: "ready" });
+      report({ state: "ready", backend });
     });
   } catch (err) {
     report({ state: "error", message: err instanceof Error ? err.message : String(err) });
@@ -232,7 +240,7 @@ function command(name: string, a = "", b = "", n = 0, embedding = 0) {
   return { status: M._orec_last_status(), body };
 }
 
-async function onFrame(id: number, frame: ImageBitmap, viewName: ViewName) {
+async function onFrame(id: number, frame: ImageBitmap, viewName: ViewName | null) {
   const { width, height } = frame;
   if (!canvas || canvas.width !== width || canvas.height !== height)
     canvas = new OffscreenCanvas(width, height);
@@ -254,7 +262,7 @@ async function onFrame(id: number, frame: ImageBitmap, viewName: ViewName) {
   lastFrameAt = now;
 
   let view: ImageBitmap | null = null;
-  const viewPtr = M._orec_view(VIEW_INDEX[viewName]);
+  const viewPtr = viewName ? M._orec_view(VIEW_INDEX[viewName]) : 0;
   if (viewPtr) {
     const rgba = new Uint8ClampedArray(M.HEAPU8.buffer, viewPtr, width * height * 4).slice();
     view = await createImageBitmap(new ImageData(rgba, width, height));

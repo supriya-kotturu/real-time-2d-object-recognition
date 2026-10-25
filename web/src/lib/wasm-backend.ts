@@ -21,7 +21,7 @@ class WasmBackend {
   status: string | null = null;
   fatal: string | null = null;
   model: ModelState = { state: "loading", progress: 0 };
-  view: ViewName = "annotated";
+  view: ViewName | null = "annotated"; // null: the GUI draws the overlay on the live camera
 
   // Lazy: modules are also evaluated during prerendering, where there is no Worker.
   start() {

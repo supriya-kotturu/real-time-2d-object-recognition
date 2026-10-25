@@ -110,9 +110,13 @@ export function SettingsCard({ status }: { status: Status | null }) {
         )}
         {classifier === "resnet18" ? (
           <p className="setting-note">
-            ResNet18 compares whole-image embeddings: 47/47 on our test split, but slower (
-            {USE_WASM ? "~250 ms per frame in your browser" : "~40 ms per frame on a laptop CPU"})
-            and sensitive to lighting changes. Switch to Hand features to compare.
+            ResNet18 compares whole-image embeddings: 47/47 on our test split.{" "}
+            {!USE_WASM
+              ? "Slower than hand features (~40 ms per frame on a laptop CPU)"
+              : model.state === "ready" && model.backend === "webgpu"
+                ? "Running on your GPU via WebGPU"
+                : "Slower here (~250 ms per frame: this browser offers no WebGPU, so it runs on the CPU)"}
+            , and sensitive to lighting changes. Switch to Hand features to compare.
           </p>
         ) : (
           <p className="setting-note">

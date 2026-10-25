@@ -4,12 +4,14 @@
 export type ViewName = "annotated" | "threshold" | "regions";
 
 export type ToWorker =
-  | { type: "frame"; id: number; frame: ImageBitmap; view: ViewName }
+  // view null: the GUI shows the live camera and draws the overlay itself (D-29), so no image
+  // needs to come back.
+  | { type: "frame"; id: number; frame: ImageBitmap; view: ViewName | null }
   | { type: "command"; id: number; name: string; a?: string; b?: string; n?: number };
 
 export type ModelState =
   | { state: "loading"; progress: number } // 0..1 of the 47 MB download
-  | { state: "ready" }
+  | { state: "ready"; backend: "webgpu" | "wasm" }
   | { state: "error"; message: string };
 
 export type FromWorker =

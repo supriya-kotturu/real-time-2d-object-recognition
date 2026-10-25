@@ -126,6 +126,7 @@ class Session {
     bool canClassify_ = false;
     objectrecognition::Match match_{};
     std::string currentPrediction_;  // this frame's label, "unknown", or "" with no object
+    std::string overlayText_;        // the label drawn at the object, also sent in the status
     int samplesAdded_ = 0;
     AddedSample lastAdded_;
 };

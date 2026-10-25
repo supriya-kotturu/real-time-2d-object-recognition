@@ -114,6 +114,7 @@ void Session::finish(const std::vector<double>* embedding) {
                               autoLearn_.targetSamples(),
                               autoLearn_.awaitingMove() ? "move or rotate" : "hold still");
         drawFeatures(display_, result_.features, text);
+        overlayText_ = text;
     }
 }
 
@@ -160,7 +161,18 @@ std::string Session::statusJson(const StatusExtras& extras) const {
            << R"(,"target":)" << autoLearn_.targetSamples() << R"(,"phase":")"
            << (autoLearn_.awaitingMove() ? "move" : "hold") << R"("},"object":)";
     if (result_.hasFeatures) {
-        status << R"({"features":{)";
+        // The overlay as geometry (D-29): a GUI showing the live camera draws it itself, so the
+        // video isn't held back to recognition speed. Frame pixel coordinates.
+        const auto& f = result_.features;
+        const auto box = orec::orientedBox(f);
+        const cv::Point2d u(std::cos(f.theta), std::sin(f.theta));
+        const cv::Point2d a = f.centroid + f.minE1 * u, b = f.centroid + f.maxE1 * u;
+        status << cv::format(
+            R"({"overlay":{"frame":[%d,%d],"box":[[%.1f,%.1f],[%.1f,%.1f],[%.1f,%.1f],[%.1f,%.1f]],)"
+            R"("axis":[[%.1f,%.1f],[%.1f,%.1f]],"centroid":[%.1f,%.1f],"text":")",
+            frame_.cols, frame_.rows, box[0].x, box[0].y, box[1].x, box[1].y, box[2].x, box[2].y,
+            box[3].x, box[3].y, a.x, a.y, b.x, b.y, f.centroid.x, f.centroid.y)
+               << jsonEscape(overlayText_) << R"("},"features":{)";
         for (size_t i = 0; i < result_.features.values.size(); ++i)
             status << (i ? "," : "") << '"' << orec::kFeatureNames[i]
                    << "\":" << result_.features.values[i];
