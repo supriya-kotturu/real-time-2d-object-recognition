@@ -113,8 +113,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(body.error ?? `HTTP ${res.status}`);
+  // A sleeping HF Space answers with an HTML "starting" page, often with 200: that is not a
+  // status, so it must count as offline rather than as an empty object.
+  const body = await res.json().catch(() => null);
+  if (!res.ok || body === null) throw new ApiError(body?.error ?? `HTTP ${res.status}`);
   return body as T;
 }
 

@@ -1,0 +1,21 @@
+# D-26: Netlify serves the static GUI; server.exe runs on the Hugging Face Space. Production
+# deploys from main; branch deploys (e.g. stack-objrec--<site>.netlify.app) test first.
+
+[build]
+  base = "web"
+  command = "OBJREC_EXPORT=1 npm run build"
+  publish = "out"
+
+[build.environment]
+  NODE_VERSION = "22"
+  # The MJPEG stream and the camera WebSocket go straight to the Space: Netlify's proxy
+  # doesn't carry WebSocket upgrades, and buffering a multipart stream would stall it.
+  NEXT_PUBLIC_STREAM_ORIGIN = "https://supriya-kotturu-real-time-object-recognition.hf.space"
+
+# JSON API through Netlify, so fetches stay same-origin (no CORS preflights). The browser's
+# Origin is forwarded, which the Space admits via --allow-origin.
+[[redirects]]
+  from = "/api/*"
+  to = "https://supriya-kotturu-real-time-object-recognition.hf.space/api/:splat"
+  status = 200
+  force = true

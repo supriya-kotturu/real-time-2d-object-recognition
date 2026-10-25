@@ -96,6 +96,18 @@ export function SettingsCard({ status }: { status: Status | null }) {
           onValueChange={(v) => setDraft(first(v))}
           onValueCommitted={(v) => commit(first(v))}
         />
+        {classifier === "resnet18" ? (
+          <p className="setting-note">
+            ResNet18 compares whole-image embeddings: 47/47 on our test split, but slower (about
+            100 ms per frame on the hosted CPU) and sensitive to lighting changes. Switch to Hand
+            features to compare.
+          </p>
+        ) : (
+          <p className="setting-note">
+            Hand features use shape only (fill, aspect ratio, Hu moments): fast, but 26/47 on our
+            test split, since round blob-like objects look alike.
+          </p>
+        )}
       </CardContent>
     </Card>
   );

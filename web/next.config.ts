@@ -10,7 +10,11 @@ const backend = process.env.OBJREC_BACKEND ?? "http://127.0.0.1:8080";
 const staticExport = process.env.OBJREC_EXPORT === "1";
 
 const nextConfig: NextConfig = {
-  ...(staticExport && { output: "export", env: { NEXT_PUBLIC_STREAM_ORIGIN: "" } }),
+  // Served by server.exe itself: "" (same origin). Built on Netlify: the HF Space's URL.
+  ...(staticExport && {
+    output: "export",
+    env: { NEXT_PUBLIC_STREAM_ORIGIN: process.env.NEXT_PUBLIC_STREAM_ORIGIN ?? "" },
+  }),
   // Partial prerendering needs a Next server; the static export has none.
   cacheComponents: !staticExport,
   partialPrefetching: !staticExport,

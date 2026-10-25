@@ -63,4 +63,5 @@ COPY data/db data/db
 # Spaces run the container as uid 1000; --public never writes, so read-only files are fine.
 USER 1000
 EXPOSE 7860
-CMD ["out/server", "--public", "--browser", "7860"]
+# The Netlify-hosted GUI (D-26) talks to this server cross-origin.
+CMD ["out/server", "--public", "--allow-origin", "real-time-object-recognition.netlify.app", "--browser", "7860"]

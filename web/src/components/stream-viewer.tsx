@@ -21,7 +21,10 @@ export function StreamViewer({ status, connected }: StreamViewerProps) {
   const browserSource = connected && status?.browser;
 
   let overlay: string | null = null;
-  if (!connected) overlay = `Waiting for server.exe${STREAM_ORIGIN ? ` on ${STREAM_ORIGIN}` : ""}…`;
+  if (!connected)
+    overlay = STREAM_ORIGIN.startsWith("https://")
+      ? "Waking up the recognition server on Hugging Face. The first load after a quiet spell can take a minute…"
+      : `Waiting for server.exe${STREAM_ORIGIN ? ` on ${STREAM_ORIGIN}` : ""}…`;
   else if (browserSource && camera.phase === "error") overlay = camera.error;
   else if (browserSource && camera.phase !== "live")
     overlay =

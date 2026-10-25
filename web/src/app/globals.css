@@ -242,6 +242,9 @@
     @apply text-right font-mono font-semibold tabular-nums text-foreground;
   }
 
+  .setting-note {
+    @apply text-xs leading-relaxed text-muted-foreground;
+  }
   .setting-row {
     @apply flex items-center justify-between text-sm;
   }
