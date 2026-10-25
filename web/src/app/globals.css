@@ -83,38 +83,41 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* Silhouette "lab bench" (D-28): near-black ink with a green cast, lime accent = the oriented
+   box the C++ overlay draws, blue = its primary axis. Dark is the default (layout.tsx). */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #0b0f0c;
+  --foreground: #e7f2ea;
+  --card: #121a15;
+  --card-foreground: #e7f2ea;
+  --popover: #121a15;
+  --popover-foreground: #e7f2ea;
+  --primary: #7cff6b;
+  --primary-foreground: #06210a;
+  --secondary: #1b2620;
+  --secondary-foreground: #e7f2ea;
+  --muted: #1b2620;
+  --muted-foreground: #8aa596;
+  --accent: #1b2620;
+  --accent-foreground: #e7f2ea;
+  --destructive: #ff6b6b;
+  --border: #22302a;
+  --input: #2a3a32;
+  --ring: #7cff6b;
+  --axis: #4d8dff;
+  --chart-1: #7cff6b;
+  --chart-2: #4d8dff;
+  --chart-3: #f5c451;
+  --chart-4: #ff6b6b;
+  --chart-5: #8aa596;
+  --sidebar: #121a15;
+  --sidebar-foreground: #e7f2ea;
+  --sidebar-primary: #7cff6b;
+  --sidebar-primary-foreground: #06210a;
+  --sidebar-accent: #1b2620;
+  --sidebar-accent-foreground: #e7f2ea;
+  --sidebar-border: #22302a;
+  --sidebar-ring: #7cff6b;
 }
 
 @layer base {
@@ -146,6 +149,12 @@
   }
   .dashboard-header {
     @apply flex flex-wrap items-center justify-between gap-3;
+  }
+  .brand {
+    @apply flex items-center gap-3;
+  }
+  .brand-logo {
+    @apply size-10 shrink-0;
   }
   .dashboard-title {
     @apply text-2xl font-semibold tracking-tight;
@@ -242,6 +251,21 @@
     @apply text-right font-mono font-semibold tabular-nums text-foreground;
   }
 
+  .gallery-grid {
+    @apply grid grid-cols-4 gap-2;
+  }
+  .gallery-item {
+    @apply relative flex flex-col gap-1;
+  }
+  .gallery-thumb {
+    @apply aspect-square w-full rounded-md bg-muted object-contain;
+  }
+  .gallery-caption {
+    @apply truncate text-xs text-muted-foreground;
+  }
+  .gallery-remove {
+    @apply absolute top-1 right-1 opacity-80 hover:opacity-100;
+  }
   .setting-note {
     @apply text-xs leading-relaxed text-muted-foreground;
   }

@@ -13,6 +13,7 @@ import {
   sha256Hex,
 } from "@/lib/onnx-patch";
 import type { FromWorker, ModelState, ToWorker, ViewName } from "@/worker/protocol";
+import { SampleStore, STORE_CAP, type StoredSample } from "@/worker/sample-store";
 
 const TENSOR_SIZE = 3 * 224 * 224;
 const EMBEDDING_SIZE = 512;
@@ -22,6 +23,7 @@ const VIEW_INDEX: Record<ViewName, number> = { annotated: 0, threshold: 1, regio
 interface Objrec {
   HEAPU8: Uint8Array;
   HEAPF32: Float32Array;
+  HEAPF64: Float64Array;
   FS: { mkdirTree(p: string): void; writeFile(p: string, d: Uint8Array): void };
   UTF8ToString(p: number): string;
   stringToNewUTF8(s: string): number;
@@ -38,6 +40,15 @@ interface Objrec {
   _orec_status(fps: number): number;
   _orec_command(name: number, a: number, b: number, n: number, embedding: number): number;
   _orec_last_status(): number;
+  _orec_added_count(): number;
+  _orec_added_label(): number;
+  _orec_added_features_len(): number;
+  _orec_added_features(): number;
+  _orec_added_embedding(): number;
+  _orec_added_thumb(maxSide: number): number;
+  _orec_thumb_width(): number;
+  _orec_thumb_height(): number;
+  _orec_import(label: number, features: number, n: number, embedding: number): void;
 }
 
 const post = (msg: FromWorker, transfer: Transferable[] = []) => self.postMessage(msg, transfer);
@@ -48,6 +59,10 @@ let embeddingPtr = 0; // reused 512-float buffer handed to C++
 let canvas: OffscreenCanvas | null = null;
 let fps = 0;
 let lastFrameAt = 0;
+let store: SampleStore | null = null;
+let storedCount = 0;
+let seenAdded = 0; // Session's added-sample counter at the last check
+const THUMB_SIDE = 96;
 
 const status = () => M.UTF8ToString(M._orec_status(fps));
 
@@ -66,6 +81,82 @@ async function loadPipeline() {
   // page is usable before the 47 MB download finishes.
   M._orec_init(0);
   embeddingPtr = M._malloc(EMBEDDING_SIZE * 4);
+  store = await SampleStore.open();
+  await importStored();
+}
+
+// --- D-28: the visitor's samples survive a refresh (IndexedDB, on this device only). ---
+
+async function importStored() {
+  const samples = store ? await store.all() : [];
+  storedCount = samples.length;
+  for (const s of samples) {
+    const label = M.stringToNewUTF8(s.label);
+    const features = M._malloc(s.features.length * 8);
+    M.HEAPF64.set(s.features, features / 8);
+    let embedding = 0;
+    if (s.embedding) {
+      embedding = M._malloc(EMBEDDING_SIZE * 4);
+      M.HEAPF32.set(s.embedding, embedding / 4);
+    }
+    M._orec_import(label, features, s.features.length, embedding);
+    [label, features, embedding].forEach((p) => p && M._free(p));
+  }
+}
+
+// Writes the sample Session just added (Train, or auto-learn during a frame) to IndexedDB.
+// Past the cap it stays in memory for this tab only; the commands below refuse before that.
+async function persistAdded() {
+  const added = M._orec_added_count();
+  if (added === seenAdded) return;
+  seenAdded = added;
+  if (!store || storedCount >= STORE_CAP) return;
+
+  const n = M._orec_added_features_len();
+  const fPtr = M._orec_added_features();
+  const ePtr = M._orec_added_embedding();
+  const sample: StoredSample = {
+    label: M.UTF8ToString(M._orec_added_label()),
+    features: Array.from(M.HEAPF64.subarray(fPtr / 8, fPtr / 8 + n)),
+    embedding: ePtr ? Float32Array.from(M.HEAPF64.subarray(ePtr / 8, ePtr / 8 + EMBEDDING_SIZE)) : null,
+    thumb: null,
+    createdAt: Date.now(),
+  };
+  const tPtr = M._orec_added_thumb(THUMB_SIDE);
+  if (tPtr) {
+    const w = M._orec_thumb_width(), h = M._orec_thumb_height();
+    const rgba = new Uint8ClampedArray(M.HEAPU8.buffer, tPtr, w * h * 4).slice();
+    const thumb = new OffscreenCanvas(w, h);
+    thumb.getContext("2d")!.putImageData(new ImageData(rgba, w, h), 0, 0);
+    sample.thumb = await thumb.convertToBlob({ type: "image/jpeg", quality: 0.85 });
+  }
+  try {
+    await store.add(sample);
+    storedCount++;
+  } catch {
+    // Quota or private mode: the sample still works for this tab.
+  }
+}
+
+// Back to the built-in training set plus whatever is still stored.
+async function rebuild() {
+  command("resetDb");
+  await importStored();
+  seenAdded = M._orec_added_count();
+}
+
+function galleryReply() {
+  return (async () => {
+    const samples = store ? await store.all() : [];
+    const reader = new FileReaderSync();
+    const items = samples.map((s) => ({
+      id: s.id,
+      label: s.label,
+      createdAt: s.createdAt,
+      thumb: s.thumb ? reader.readAsDataURL(s.thumb) : null,
+    }));
+    return { status: 200, body: JSON.stringify({ cap: STORE_CAP, available: store !== null, items }) };
+  })();
 }
 
 async function download(onProgress: (p: number) => void): Promise<Uint8Array> {
@@ -153,6 +244,7 @@ async function onFrame(id: number, frame: ImageBitmap, viewName: ViewName) {
 
   const needsEmbedding = M._orec_process() === 1 && session !== null;
   M._orec_finish(needsEmbedding ? await embed(M._orec_roi_tensor()) : 0);
+  await persistAdded(); // auto-learn adds samples inside finish
 
   const now = performance.now();
   if (lastFrameAt) {
@@ -170,7 +262,34 @@ async function onFrame(id: number, frame: ImageBitmap, viewName: ViewName) {
   post({ type: "frameDone", id, status: status(), view }, view ? [view] : []);
 }
 
-async function onCommand(msg: Extract<ToWorker, { type: "command" }>) {
+const full = () => ({
+  status: 409,
+  body: JSON.stringify({
+    error: `This browser keeps up to ${STORE_CAP} of your samples (${storedCount} stored). Delete some under "Your samples" first.`,
+  }),
+});
+
+async function runCommand(msg: Extract<ToWorker, { type: "command" }>) {
+  switch (msg.name) {
+    case "gallery":
+      return galleryReply();
+    case "galleryDelete":
+      await store?.remove(Number(msg.a));
+      await rebuild();
+      return galleryReply();
+    case "galleryClear":
+    case "resetDb": // "Reset DB" means back to the original training set, so storage goes too
+      await store?.clear();
+      await rebuild();
+      return msg.name === "resetDb" ? command("db") : galleryReply();
+    case "train":
+      if (store && storedCount >= STORE_CAP) return full();
+      break;
+    case "autoLearnLabel": // one run collects 5 poses
+      if (store && storedCount > STORE_CAP - 5) return full();
+      break;
+  }
+
   let embedding = 0;
   // train adds to both DBs, so it needs this frame's embedding even on hand features.
   if (msg.name === "train" && session) {
@@ -178,7 +297,18 @@ async function onCommand(msg: Extract<ToWorker, { type: "command" }>) {
     if (tensor) embedding = await embed(tensor);
   }
   const reply = command(msg.name, msg.a, msg.b, msg.n, embedding);
-  post({ type: "reply", id: msg.id, ...reply });
+  if (reply.status < 400) {
+    if (msg.name === "train") await persistAdded();
+    if (msg.name === "deleteLabel" && store) {
+      await store.removeLabel(msg.a ?? "");
+      storedCount = await store.count();
+    }
+  }
+  return reply;
+}
+
+async function onCommand(msg: Extract<ToWorker, { type: "command" }>) {
+  post({ type: "reply", id: msg.id, ...(await runCommand(msg)) });
 }
 
 // Messages are handled strictly in order: the Session isn't re-entrant, and a frame awaiting

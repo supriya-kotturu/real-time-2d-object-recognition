@@ -99,6 +99,20 @@ export interface EvalMatrix {
   accuracy: number;
 }
 
+// D-28: the visitor's own samples, stored in their browser (browser build only).
+export interface GalleryItem {
+  id: number;
+  label: string;
+  createdAt: number;
+  thumb: string | null; // data: URL of the crop it learned from
+}
+
+export interface Gallery {
+  cap: number;
+  available: boolean; // false when the browser blocks IndexedDB (some private modes)
+  items: GalleryItem[];
+}
+
 export interface DbSummary {
   total: number;
   labels: { label: string; count: number }[];
@@ -145,6 +159,9 @@ export const api = {
     request<{ label: string }>("/api/label", { method: "POST", body: JSON.stringify({ label }) }),
   train: () => request<DbSummary>("/api/train", { method: "POST" }),
   resetDb: () => request<DbSummary>("/api/db/reset", { method: "POST" }),
+  gallery: () => request<Gallery>("/api/gallery"),
+  galleryDelete: (id: number) => request<Gallery>(`/api/gallery/${id}`, { method: "DELETE" }),
+  galleryClear: () => request<Gallery>("/api/gallery", { method: "DELETE" }),
   capture: () => request<{ saved: string }>("/api/capture", { method: "POST" }),
   next: () => request<object>("/api/next", { method: "POST" }),
   setClassifier: (classifier: Classifier, metric?: Metric) =>

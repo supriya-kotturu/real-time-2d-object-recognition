@@ -118,7 +118,14 @@ export async function wasmRequest(path: string, method: string, body: unknown): 
   if (method === "DELETE" && deleteMatch)
     return wasmBackend.command("deleteLabel", decodeURIComponent(deleteMatch[1]));
 
+  const galleryMatch = path.match(/^\/api\/gallery\/(\d+)$/);
+  if (method === "DELETE" && galleryMatch) return wasmBackend.command("galleryDelete", galleryMatch[1]);
+
   switch (route) {
+    case "GET /api/gallery":
+      return wasmBackend.command("gallery");
+    case "DELETE /api/gallery":
+      return wasmBackend.command("galleryClear");
     case "GET /api/db":
       return wasmBackend.command("db");
     case "POST /api/db/reset":

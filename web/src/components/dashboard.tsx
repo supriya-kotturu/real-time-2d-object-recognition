@@ -6,6 +6,8 @@ import { AutoLearnCard } from "@/components/auto-learn-card";
 import { DatabaseCard } from "@/components/database-card";
 import { EvaluateCard } from "@/components/evaluate-card";
 import { FeaturesCard } from "@/components/features-card";
+import { GalleryCard } from "@/components/gallery-card";
+import { Logo } from "@/components/logo";
 import { PredictionCard } from "@/components/prediction-card";
 import { SettingsCard } from "@/components/settings-card";
 import { StreamViewer } from "@/components/stream-viewer";
@@ -15,6 +17,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDb } from "@/hooks/use-db";
 import { useStatus } from "@/hooks/use-status";
 import { api, errorMessage, MODES, type Mode } from "@/lib/api";
+import { USE_WASM } from "@/lib/wasm-backend";
 
 export function Dashboard() {
   const { status, connected } = useStatus();
@@ -28,9 +31,14 @@ export function Dashboard() {
   return (
     <main className="dashboard-shell">
       <header className="dashboard-header">
-        <div>
-          <h1 className="dashboard-title">Real-time 2-D Object Recognition</h1>
-          <p className="dashboard-subtitle">Threshold → clean → regions → features → nearest neighbour</p>
+        <div className="brand">
+          <Logo className="brand-logo" />
+          <div>
+            <h1 className="dashboard-title">Silhouette</h1>
+            <p className="dashboard-subtitle">
+              See the shape, name the thing · threshold → clean → regions → features → nearest neighbour
+            </p>
+          </div>
         </div>
         <div className="header-actions">
           <Tabs value={mode} onValueChange={(v) => changeMode(v as Mode)}>
@@ -64,6 +72,7 @@ export function Dashboard() {
           {mode === "collect" && (
             <>
               <TrainingControls status={status} onTrained={refresh} />
+              {USE_WASM && <GalleryCard dbSize={status?.dbSize} />}
               <DatabaseCard db={db} onChanged={refresh} publicDemo={status?.public} />
             </>
           )}
