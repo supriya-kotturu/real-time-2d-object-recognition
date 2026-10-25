@@ -6,6 +6,7 @@
 //   WS     /ws/frames                                  binary JPEG in, {"ok":true} ack out
 //   GET    /stream?view=annotated|threshold|regions   multipart MJPEG
 //   GET    /api/status                                 latest frame's threshold, features, match
+//   POST   /api/db/reset                               reload both DBs from disk (D-26)
 //   GET    /api/db                                     sample count per label
 //   DELETE /api/db/<label>                             drop every sample with that label
 //   POST   /api/label     {"label": "scissors"}
@@ -152,10 +153,16 @@ void sendJson(httplib::Response& res, const Reply& reply) {
 // user's browser POST to 127.0.0.1 (as a CORS "simple" request) or open a WebSocket, which
 // CORS doesn't cover at all. Browsers always send Origin on those, so only the GUI's own
 // origin is let through; requests without Origin (curl, <img> stream loads) are not cross-site.
+// Same-origin also passes: in --public mode this server serves the GUI itself (D-26), so the
+// page's Origin host equals the Host it sends, behind any TLS-terminating proxy.
 bool isAllowedOrigin(const httplib::Request& req) {
     if (!req.has_header("Origin")) return true;
+    const std::string origin = req.get_header_value("Origin");
     static const std::regex local(R"(^http://(localhost|127\.0\.0\.1)(:[0-9]{1,5})?$)");
-    return std::regex_match(req.get_header_value("Origin"), local);
+    if (std::regex_match(origin, local)) return true;
+    static const std::regex scheme(R"(^https?://)");
+    return req.has_header("Host") &&
+           std::regex_replace(origin, scheme, "") == req.get_header_value("Host");
 }
 
 }  // namespace
@@ -163,8 +170,22 @@ bool isAllowedOrigin(const httplib::Request& req) {
 int main(int argc, char** argv) {
     cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_WARNING);
 
-    const std::string spec = argc > 1 ? argv[1] : "--browser";
-    const int port = argc > 2 ? std::stoi(argv[2]) : 8080;
+    // --public (D-26): hosted demo. Listens on every interface, keeps visitors' DB changes in
+    // memory only (the committed DB is never modified), disables Capture (it writes images),
+    // and serves the static GUI from web/out so page, API and WebSocket share one origin.
+    bool isPublic = false;
+    std::vector<std::string> positional;
+    for (int i = 1; i < argc; ++i) {
+        const std::string arg = argv[i];
+        if (arg == "--public")
+            isPublic = true;
+        else
+            positional.push_back(arg);
+    }
+    const std::string spec = positional.size() > 0 ? positional[0] : "--browser";
+    const int port = positional.size() > 1 ? std::stoi(positional[1]) : 8080;
+    const std::string host = isPublic ? "0.0.0.0" : "127.0.0.1";
+    const bool persist = !isPublic;
     const bool browser = spec == "--browser";
     std::optional<FrameSource> source;
     if (!browser) {
@@ -179,7 +200,9 @@ int main(int argc, char** argv) {
 
     Shared shared;
     FrameMailbox mailbox;
+    std::atomic<int> cameraClients{0};
     httplib::Server http;
+    if (fs::is_directory("web/out")) http.set_mount_point("/", "web/out");
 
     // Runs before routing and before WebSocket upgrades.
     http.set_pre_routing_handler([](const httplib::Request& req, httplib::Response& res) {
@@ -191,6 +214,18 @@ int main(int argc, char** argv) {
     // One connection per camera tab. The ack is sent only after the pipeline took the frame,
     // so a client that waits for it never has more than one frame in flight (H-50).
     http.WebSocket("/ws/frames", [&](const httplib::Request&, httplib::ws::WebSocket& ws) {
+        // One camera at a time: two would interleave frames from different scenes, and every
+        // visitor shares one pipeline, so a second tab would hijack the first one's view.
+        if (cameraClients.fetch_add(1) > 0) {
+            --cameraClients;
+            ws.send(jsonError("camera busy: another tab or visitor is streaming"));
+            ws.close();
+            return;
+        }
+        struct Release {
+            std::atomic<int>& n;
+            ~Release() { --n; }
+        } release{cameraClients};
         ws.set_read_timeout(1s);  // wake up regularly so an idle tab can't block shutdown
         std::string msg;
         while (shared.running && ws.is_open()) {
@@ -302,13 +337,13 @@ int main(int argc, char** argv) {
 
     const auto addSample = [&](const std::string& name) {
         const orec::Sample sample{name, result.features.values};
-        appendSample(kDbPath, sample);
+        if (persist) appendSample(kDbPath, sample);
         db.push_back(sample);
         stdevs = orec::featureStdevs(db);
         // Both DBs grow together, so switching classifier never forgets what was just taught.
         if (const auto* e = currentEmbedding()) {
             const orec::Sample embedded{name, *e};
-            appendSample(kEmbedDbPath, embedded);
+            if (persist) appendSample(kEmbedDbPath, embedded);
             embedDb.push_back(embedded);
         }
     };
@@ -358,6 +393,17 @@ int main(int argc, char** argv) {
         sendJson(res, runOnPipeline(shared, [&] { return Reply{200, dbJson()}; }));
     });
 
+    // Undo every train/delete since the last save: on the public demo that is everything a
+    // visitor changed, since nothing there is written to disk.
+    http.Post("/api/db/reset", [&](const httplib::Request&, httplib::Response& res) {
+        sendJson(res, runOnPipeline(shared, [&] {
+                     db = loadFeatureDb(kDbPath);
+                     embedDb = loadFeatureDb(kEmbedDbPath);
+                     stdevs = orec::featureStdevs(db);
+                     return Reply{200, dbJson()};
+                 }));
+    });
+
     http.Delete(
         R"(/api/db/([A-Za-z0-9_-]+))", [&](const httplib::Request& req, httplib::Response& res) {
             const std::string target = req.matches[1];
@@ -375,8 +421,10 @@ int main(int argc, char** argv) {
                          const bool droppedEmbeddings = drop(embedDb);
                          if (!droppedFeatures && !droppedEmbeddings)
                              return Reply{404, jsonError("no such label")};
-                         saveFeatureDb(kDbPath, db);
-                         saveFeatureDb(kEmbedDbPath, embedDb);
+                         if (persist) {
+                             saveFeatureDb(kDbPath, db);
+                             saveFeatureDb(kEmbedDbPath, embedDb);
+                         }
                          stdevs = orec::featureStdevs(db);
                          return Reply{200, dbJson()};
                      }));
@@ -406,6 +454,8 @@ int main(int argc, char** argv) {
     http.Post("/api/capture", [&](const httplib::Request&, httplib::Response& res) {
         sendJson(res, runOnPipeline(shared, [&] {
                      if (label.empty()) return Reply{409, jsonError("set a label first")};
+                     if (!persist)
+                         return Reply{403, jsonError("capture is disabled on the public demo")};
                      if (frame.empty()) return Reply{409, jsonError("no camera frame yet")};
                      const std::string file = timestamp() + ".png";
                      saveImage(fs::path("data/objects") / label, file, frame);
@@ -510,9 +560,11 @@ int main(int argc, char** argv) {
                      if (currentPrediction.empty())
                          return Reply{409, jsonError("no object detected")};
                      liveMatrix.add(label, currentPrediction);
-                     fs::create_directories("out/eval");
-                     std::ofstream("out/eval/live_confusion.md") << liveMatrix.toMarkdown();
-                     std::ofstream("out/eval/live_confusion.csv") << liveMatrix.toCsv();
+                     if (persist) {
+                         fs::create_directories("out/eval");
+                         std::ofstream("out/eval/live_confusion.md") << liveMatrix.toMarkdown();
+                         std::ofstream("out/eval/live_confusion.csv") << liveMatrix.toCsv();
+                     }
                      return Reply{200, matrixJson()};
                  }));
     });
@@ -524,14 +576,16 @@ int main(int argc, char** argv) {
                  }));
     });
 
-    // Loopback only: the API can write files and delete DB rows, so it must not face the LAN.
+    // Loopback unless --public: locally the API writes files and deletes DB rows, so it must
+    // not face the LAN. The public mode writes nothing to disk.
     std::thread httpThread([&] {
-        if (!http.listen("127.0.0.1", port)) {
-            std::cerr << "cannot listen on 127.0.0.1:" << port << "\n";
+        if (!http.listen(host, port)) {
+            std::cerr << "cannot listen on " << host << ":" << port << "\n";
             shared.running = false;
         }
     });
-    std::cout << "serving on http://127.0.0.1:" << port << "  (source: " << spec
+    std::cout << "serving on http://" << host << ":" << port << (isPublic ? " [public]" : "")
+              << "  (source: " << spec
               << ", db: " << db.size() << " samples)" << std::endl;
     if (browser)
         std::cout << "waiting for the GUI camera on ws://127.0.0.1:" << port << "/ws/frames"
@@ -562,6 +616,7 @@ int main(int argc, char** argv) {
                << R"(,"label":")" << jsonEscape(label) << R"(","source":")"
                << jsonEscape(sourceName()) << R"(","still":)" << (isStill() ? "true" : "false")
                << R"(,"browser":)" << (browser ? "true" : "false") << R"(,"dbSize":)" << db.size()
+               << R"(,"public":)" << (isPublic ? "true" : "false")
                << R"(,"embedDbSize":)" << embedDb.size() << R"(,"classifier":")" << classifier
                << R"(","metric":")" << metric << R"(","resnetAvailable":)"
                << (embedder ? "true" : "false") << R"(,"unknownThreshold":)" << cutoffs[metric]
