@@ -4,6 +4,7 @@
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <string>
 
 namespace objectrecognition {
 
@@ -39,19 +40,6 @@ double scaledEuclidean(const std::vector<double>& a, const std::vector<double>& 
     return std::sqrt(sum);
 }
 
-Match classifyNearest(const std::vector<Sample>& db, const std::vector<double>& stdevs,
-                      const std::vector<double>& features, double unknownThreshold) {
-    if (db.empty()) throw std::invalid_argument("classifyNearest: empty DB");
-    Match best{"", std::numeric_limits<double>::max(), false};
-    for (const auto& s : db) {
-        if (s.features.size() != features.size()) continue;  // stale row from an older layout
-        const double d = scaledEuclidean(features, s.features, stdevs);
-        if (d < best.distance) best = {s.label, d, false};
-    }
-    best.known = best.distance <= unknownThreshold;
-    return best;
-}
-
 double cosineDistance(const std::vector<double>& a, const std::vector<double>& b) {
     double dot = 0, na = 0, nb = 0;
     for (size_t i = 0; i < a.size(); ++i) {
@@ -63,17 +51,46 @@ double cosineDistance(const std::vector<double>& a, const std::vector<double>& b
     return 1.0 - dot / (std::sqrt(na) * std::sqrt(nb));
 }
 
-Match classifyCosine(const std::vector<Sample>& db, const std::vector<double>& features,
-                     double unknownThreshold) {
-    if (db.empty()) throw std::invalid_argument("classifyCosine: empty DB");
+double sumSquaredDifference(const std::vector<double>& a, const std::vector<double>& b) {
+    double sum = 0.0;
+    for (size_t i = 0; i < a.size(); ++i) sum += (a[i] - b[i]) * (a[i] - b[i]);
+    return sum;
+}
+
+namespace {
+
+template <class Distance>
+Match nearest(const std::vector<Sample>& db, const std::vector<double>& query,
+              double unknownThreshold, const char* caller, Distance distance) {
+    if (db.empty()) throw std::invalid_argument(std::string(caller) + ": empty DB");
     Match best{"", std::numeric_limits<double>::max(), false};
     for (const auto& s : db) {
-        if (s.features.size() != features.size()) continue;
-        const double d = cosineDistance(features, s.features);
+        if (s.features.size() != query.size()) continue;  // stale row from an older layout
+        const double d = distance(query, s.features);
         if (d < best.distance) best = {s.label, d, false};
     }
     best.known = best.distance <= unknownThreshold;
     return best;
+}
+
+}  // namespace
+
+Match classifyNearest(const std::vector<Sample>& db, const std::vector<double>& stdevs,
+                      const std::vector<double>& features, double unknownThreshold) {
+    return nearest(db, features, unknownThreshold, "classifyNearest",
+                   [&](const auto& a, const auto& b) { return scaledEuclidean(a, b, stdevs); });
+}
+
+Match classifyCosine(const std::vector<Sample>& db, const std::vector<double>& features,
+                     double unknownThreshold) {
+    return nearest(db, features, unknownThreshold, "classifyCosine",
+                   [](const auto& a, const auto& b) { return cosineDistance(a, b); });
+}
+
+Match classifySsd(const std::vector<Sample>& db, const std::vector<double>& features,
+                  double unknownThreshold) {
+    return nearest(db, features, unknownThreshold, "classifySsd",
+                   [](const auto& a, const auto& b) { return sumSquaredDifference(a, b); });
 }
 
 }  // namespace objectrecognition

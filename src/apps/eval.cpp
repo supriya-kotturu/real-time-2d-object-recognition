@@ -9,10 +9,13 @@
 //   --db        every image vs a fixed hand-feature DB (e.g. trained interactively in live).
 //   --train     Task 7/9 split: the DB comes from a separate training folder (every image, or
 //               with --one-shot just the first per label); every test-dir image is a test.
-// When the ResNet18 model exists, the embedding classifier (cosine) runs on the same split,
-// so the two methods are compared on identical data.
+// When the ResNet18 model exists, the embedding classifier runs on the same split with both
+// cosine and SSD (D-25), so all methods are compared on identical data. Each run also prints
+// the nearest-match distances of correct predictions, the evidence for the GUI's default
+// unknown cutoffs.
 // Writes out/eval/confusion_<method>_<protocol>.{md,csv} and lists misclassified files.
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -60,6 +63,7 @@ void run(const std::string& name, const std::vector<Item>& items, const std::vec
          const Classify& classify) {
     orec::ConfusionMatrix matrix;
     std::vector<std::string> mistakes;
+    std::vector<double> correctDistances;
 
     // One-shot: the first image of each label (items are sorted) forms the DB. With a separate
     // training folder the exemplars come from there, so no test image is ever excluded.
@@ -88,11 +92,20 @@ void run(const std::string& name, const std::vector<Item>& items, const std::vec
         const orec::Match match = classify(db, pick(items[i]));
         const std::string predicted = match.known ? match.label : "unknown";
         matrix.add(items[i].label, predicted);
+        if (match.label == items[i].label) correctDistances.push_back(match.distance);
         if (predicted != items[i].label)
             mistakes.push_back(items[i].file + "  (" + items[i].label + " -> " + predicted +
                                cv::format(", d=%.3f)", match.distance));
     }
     report(name, protocol, matrix, mistakes);
+    if (!correctDistances.empty()) {
+        std::sort(correctDistances.begin(), correctDistances.end());
+        const auto at = [&](double q) {
+            return correctDistances[static_cast<size_t>(q * (correctDistances.size() - 1))];
+        };
+        std::cout << cv::format("  correct-match distance: median %.4g, p95 %.4g, max %.4g\n",
+                                at(0.5), at(0.95), correctDistances.back());
+    }
 }
 
 }  // namespace
@@ -182,6 +195,12 @@ int main(int argc, char** argv) {
             [](const Item& it) -> const std::vector<double>& { return it.embedding; },
             [&](const std::vector<orec::Sample>& db, const std::vector<double>& e) {
                 return orec::classifyCosine(db, e, unknownThreshold);
+            });
+        run(
+            "embedding-ssd", items, train, protocol, {},
+            [](const Item& it) -> const std::vector<double>& { return it.embedding; },
+            [&](const std::vector<orec::Sample>& db, const std::vector<double>& e) {
+                return orec::classifySsd(db, e, unknownThreshold);
             });
     }
     std::cout << "\nwrote out/eval/confusion_*.{md,csv}\n";

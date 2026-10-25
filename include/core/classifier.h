@@ -28,9 +28,17 @@ double scaledEuclidean(const std::vector<double>& a, const std::vector<double>& 
 // contrast) doesn't affect the match; only its direction does. Task 9's suggested metric.
 double cosineDistance(const std::vector<double>& a, const std::vector<double>& b);
 
+// sum_i (a_i - b_i)^2, Task 9's other suggested metric. Unlike cosine it depends on the
+// embedding's magnitude, so the same object under brighter light can land farther away.
+double sumSquaredDifference(const std::vector<double>& a, const std::vector<double>& b);
+
 // T9: one-shot nearest neighbour on embeddings by cosine distance. Requires a non-empty DB.
 Match classifyCosine(const std::vector<Sample>& db, const std::vector<double>& features,
                      double unknownThreshold);
+
+// T9 alternative (D-25): nearest neighbour on embeddings by SSD. Requires a non-empty DB.
+Match classifySsd(const std::vector<Sample>& db, const std::vector<double>& features,
+                  double unknownThreshold);
 
 // T6: nearest neighbour. Requires a non-empty DB.
 Match classifyNearest(const std::vector<Sample>& db, const std::vector<double>& stdevs,
