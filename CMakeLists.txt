@@ -49,6 +49,8 @@ add_library(objrec_app STATIC
 	src/app/auto_learn.cpp
 	src/app/embedding.cpp
 	src/app/frame_mailbox.cpp
+	src/app/roi.cpp
+	src/app/session.cpp
 )
 target_include_directories(objrec_app PUBLIC "${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(objrec_app PUBLIC objrec_core ${OpenCV_LIBS})

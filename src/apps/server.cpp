@@ -51,36 +51,23 @@
 #include <sstream>
 #include <thread>
 
-#include "app/auto_learn.h"
-#include "app/embedding.h"
 #include "app/capture.h"
-#include "app/feature_db.h"
+#include "app/embedding.h"
 #include "app/frame_mailbox.h"
 #include "app/frame_source.h"
-#include "app/overlay.h"
-#include "app/pipeline.h"
-#include "core/classifier.h"
-#include "core/evaluation.h"
+#include "app/session.h"
 
 namespace fs = std::filesystem;
-namespace orec = objectrecognition;
 using namespace std::chrono_literals;
 
 namespace {
 
-const std::string kDbPath = "data/db/features.csv";
-const std::string kEmbedDbPath = "data/db/embeddings_resnet18.csv";  // per model (H-01)
 const std::string kModelPath = "data/models/resnet18-v2-7.onnx";
 const std::vector<std::string> kViews = {"annotated", "threshold", "regions"};
 // Morphology n and the min-area filter are in pixels, tuned on 640x480 captures (D-07, D-21),
 // so larger browser frames are scaled down to this width before the pipeline sees them.
 constexpr int kPipelineWidth = 640;
 constexpr int kMaxFrameSide = 4096;
-
-struct Reply {
-    int status = 200;
-    std::string body;
-};
 
 // Everything the HTTP threads may read; guarded by m.
 struct Shared {
@@ -92,29 +79,6 @@ struct Shared {
     std::deque<std::pair<std::function<Reply()>, std::promise<Reply>>> commands;
     std::atomic<bool> running{true};
 };
-
-std::string jsonEscape(const std::string& s) {
-    std::string out;
-    for (char ch : s) {
-        switch (ch) {
-            case '"':
-                out += "\\\"";
-                break;
-            case '\\':
-                out += "\\\\";
-                break;
-            case '\n':
-                out += "\\n";
-                break;
-            default:
-                if (static_cast<unsigned char>(ch) < 0x20) continue;
-                out += ch;
-        }
-    }
-    return out;
-}
-
-std::string jsonError(const std::string& msg) { return R"({"error":")" + jsonEscape(msg) + "\"}"; }
 
 // The GUI only ever sends flat objects, so a full JSON parser isn't worth a dependency.
 bool extractString(const std::string& body, const std::string& key, std::string& out) {
@@ -203,7 +167,6 @@ int main(int argc, char** argv) {
     const std::string spec = positional.size() > 0 ? positional[0] : "--browser";
     const int port = positional.size() > 1 ? std::stoi(positional[1]) : 8080;
     const std::string host = isPublic ? "0.0.0.0" : "127.0.0.1";
-    const bool persist = !isPublic;
     const bool browser = spec == "--browser";
     std::optional<FrameSource> source;
     if (!browser) {
@@ -308,25 +271,6 @@ int main(int argc, char** argv) {
     });
 
     // --- Pipeline-thread state; only touched inside runOnPipeline commands or the loop. ---
-    std::string label;
-    std::vector<orec::Sample> db = loadFeatureDb(kDbPath);
-    std::vector<double> stdevs = orec::featureStdevs(db);
-    std::vector<orec::Sample> embedDb = loadFeatureDb(kEmbedDbPath);
-    FrameResult result;
-    cv::Mat frame, display, regionsVis;
-    bool advance = true;
-    std::string mode = "detect";
-    AutoLearn autoLearn;
-    orec::ConfusionMatrix liveMatrix;
-    std::string currentPrediction;  // this frame's label, "unknown", or "" with no object
-
-    // D-25: classifier + metric chosen in the GUI. Each metric has its own scale, so each keeps
-    // its own unknown cutoff (defaults from eval's correct-match distances).
-    std::string classifier = "features";
-    std::string metric = "scaled-euclidean";
-    std::map<std::string, double> cutoffs = {
-        {"scaled-euclidean", 3.0}, {"cosine", 0.35}, {"ssd", 500.0}};
-
     std::unique_ptr<Embedder> embedder;
     if (fs::exists(kModelPath)) {
         try {
@@ -335,269 +279,121 @@ int main(int argc, char** argv) {
             std::cerr << "ResNet18 unavailable: " << e.what() << "\n";
         }
     }
+    SessionConfig config;
+    config.persist = !isPublic;
+    config.embeddingAvailable = embedder != nullptr;
     // The public demo opens on the method that recognises the samples (47/47 vs 26/47 on the
     // T7 split); visitors can still switch to hand features to compare.
-    if (isPublic && embedder) {
-        classifier = "resnet18";
-        metric = "cosine";
+    if (isPublic) {
+        config.classifier = "resnet18";
+        config.metric = "cosine";
     }
+    Session session(config);
+    bool advance = true;
+    double fps = 0.0;
 
-    // The current frame's embedding, computed at most once per frame and only when something
-    // asks for it, so features mode pays nothing for ResNet18.
-    std::vector<double> embedding;
-    bool embeddingFresh = false;
-    const auto currentEmbedding = [&]() -> const std::vector<double>* {
-        if (!embedder || !result.hasFeatures) return nullptr;
-        if (!embeddingFresh) {
-            cv::Mat roi;
-            if (!extractAlignedRoi(frame, result.regionMap, result.regions[result.primary].id,
-                                   result.features, roi))
-                return nullptr;
-            embedder->embed(roi, embedding);
-            embeddingFresh = true;
-        }
-        return &embedding;
+    // train adds to both DBs, so it needs this frame's embedding even in features mode.
+    const auto embedCurrent = [&](std::vector<double>& out) {
+        cv::Mat roi;
+        if (!embedder || !session.currentRoi(roi)) return false;
+        embedder->embed(roi, out);
+        return true;
     };
-
-    const auto addSample = [&](const std::string& name) {
-        const orec::Sample sample{name, result.features.values};
-        if (persist) appendSample(kDbPath, sample);
-        db.push_back(sample);
-        stdevs = orec::featureStdevs(db);
-        // Both DBs grow together, so switching classifier never forgets what was just taught.
-        if (const auto* e = currentEmbedding()) {
-            const orec::Sample embedded{name, *e};
-            if (persist) appendSample(kEmbedDbPath, embedded);
-            embedDb.push_back(embedded);
-        }
-    };
-
-    const auto matrixJson = [&] {
-        const auto rows = liveMatrix.rowLabels();
-        const auto cols = liveMatrix.columnLabels();
-        std::ostringstream out;
-        const auto list = [&](const std::vector<std::string>& v) {
-            out << '[';
-            for (size_t i = 0; i < v.size(); ++i)
-                out << (i ? "," : "") << '"' << jsonEscape(v[i]) << '"';
-            out << ']';
-        };
-        out << R"({"rows":)";
-        list(rows);
-        out << R"(,"columns":)";
-        list(cols);
-        out << R"(,"counts":[)";
-        for (size_t r = 0; r < rows.size(); ++r) {
-            out << (r ? "," : "") << '[';
-            for (size_t c = 0; c < cols.size(); ++c)
-                out << (c ? "," : "") << liveMatrix.count(rows[r], cols[c]);
-            out << ']';
-        }
-        out << R"(],"total":)" << liveMatrix.total() << R"(,"accuracy":)" << liveMatrix.accuracy()
-            << '}';
-        return out.str();
-    };
-
-    const auto dbJson = [&] {
-        std::map<std::string, int> counts;
-        for (const auto& s : db) ++counts[s.label];
-        std::ostringstream out;
-        out << R"({"total":)" << db.size() << R"(,"labels":[)";
-        bool first = true;
-        for (const auto& [name, count] : counts) {
-            out << (first ? "" : ",") << R"({"label":")" << jsonEscape(name) << R"(","count":)"
-                << count << "}";
-            first = false;
-        }
-        out << "]}";
-        return out.str();
+    const auto onPipeline = [&](httplib::Response& res, std::function<Reply()> fn) {
+        sendJson(res, runOnPipeline(shared, std::move(fn)));
     };
 
     http.Get("/api/db", [&](const httplib::Request&, httplib::Response& res) {
-        sendJson(res, runOnPipeline(shared, [&] { return Reply{200, dbJson()}; }));
+        onPipeline(res, [&] { return session.db(); });
     });
 
-    // Undo every train/delete since the last save: on the public demo that is everything a
-    // visitor changed, since nothing there is written to disk.
     http.Post("/api/db/reset", [&](const httplib::Request&, httplib::Response& res) {
-        sendJson(res, runOnPipeline(shared, [&] {
-                     db = loadFeatureDb(kDbPath);
-                     embedDb = loadFeatureDb(kEmbedDbPath);
-                     stdevs = orec::featureStdevs(db);
-                     return Reply{200, dbJson()};
-                 }));
+        onPipeline(res, [&] { return session.resetDb(); });
     });
 
-    http.Delete(
-        R"(/api/db/([A-Za-z0-9_-]+))", [&](const httplib::Request& req, httplib::Response& res) {
-            const std::string target = req.matches[1];
-            sendJson(res, runOnPipeline(shared, [&, target] {
-                         const auto drop = [&](std::vector<orec::Sample>& from) {
-                             const auto before = from.size();
-                             from.erase(std::remove_if(from.begin(), from.end(),
-                                                       [&](const orec::Sample& s) {
-                                                           return s.label == target;
-                                                       }),
-                                        from.end());
-                             return from.size() != before;
-                         };
-                         const bool droppedFeatures = drop(db);
-                         const bool droppedEmbeddings = drop(embedDb);
-                         if (!droppedFeatures && !droppedEmbeddings)
-                             return Reply{404, jsonError("no such label")};
-                         if (persist) {
-                             saveFeatureDb(kDbPath, db);
-                             saveFeatureDb(kEmbedDbPath, embedDb);
-                         }
-                         stdevs = orec::featureStdevs(db);
-                         return Reply{200, dbJson()};
-                     }));
-        });
+    http.Delete(R"(/api/db/([A-Za-z0-9_-]+))",
+                [&](const httplib::Request& req, httplib::Response& res) {
+                    const std::string target = req.matches[1];
+                    onPipeline(res, [&, target] { return session.deleteLabel(target); });
+                });
 
     http.Post("/api/label", [&](const httplib::Request& req, httplib::Response& res) {
         std::string next;
-        if (!extractString(req.body, "label", next) || !isValidLabel(next)) {
-            sendJson(res, {400, jsonError("label must be 1-64 chars of [A-Za-z0-9_-]")});
-            return;
-        }
-        sendJson(res, runOnPipeline(shared, [&, next] {
-                     label = next;
-                     return Reply{200, R"({"label":")" + label + "\"}"};
-                 }));
+        extractString(req.body, "label", next);  // missing -> "" -> rejected by the session
+        onPipeline(res, [&, next] { return session.setLabel(next); });
     });
 
     http.Post("/api/train", [&](const httplib::Request&, httplib::Response& res) {
-        sendJson(res, runOnPipeline(shared, [&] {
-                     if (label.empty()) return Reply{409, jsonError("set a label first")};
-                     if (!result.hasFeatures) return Reply{409, jsonError("no object detected")};
-                     addSample(label);
-                     return Reply{200, dbJson()};
-                 }));
+        onPipeline(res, [&] {
+            std::vector<double> embedding;
+            const bool embedded = embedCurrent(embedding);
+            return session.train(embedded ? &embedding : nullptr);
+        });
     });
 
+    // Capture stays here, not in Session: it writes image files, which only the local server
+    // may do (D-26), and the browser build has nowhere to put them.
     http.Post("/api/capture", [&](const httplib::Request&, httplib::Response& res) {
-        sendJson(res, runOnPipeline(shared, [&] {
-                     if (label.empty()) return Reply{409, jsonError("set a label first")};
-                     if (!persist)
-                         return Reply{403, jsonError("capture is disabled on the public demo")};
-                     if (frame.empty()) return Reply{409, jsonError("no camera frame yet")};
-                     const std::string file = timestamp() + ".png";
-                     saveImage(fs::path("data/objects") / label, file, frame);
-                     saveImage(fs::path("out/stages/threshold") / label, file, result.binary);
-                     saveImage(fs::path("out/stages/regions") / label, file, regionsVis);
-                     saveImage(fs::path("out/stages/features") / label, file, display);
-                     return Reply{200, R"({"saved":"data/objects/)" + label + "/" + file + "\"}"};
-                 }));
+        onPipeline(res, [&] {
+            const std::string& label = session.label();
+            if (label.empty()) return Reply{409, jsonError("set a label first")};
+            if (isPublic) return Reply{403, jsonError("capture is disabled on the public demo")};
+            if (session.frame().empty()) return Reply{409, jsonError("no camera frame yet")};
+            const std::string file = timestamp() + ".png";
+            saveImage(fs::path("data/objects") / label, file, session.frame());
+            saveImage(fs::path("out/stages/threshold") / label, file, session.result().binary);
+            saveImage(fs::path("out/stages/regions") / label, file, session.regionsView());
+            saveImage(fs::path("out/stages/features") / label, file, session.annotated());
+            return Reply{200, R"({"saved":"data/objects/)" + label + "/" + file + "\"}"};
+        });
     });
 
     http.Post("/api/next", [&](const httplib::Request&, httplib::Response& res) {
-        sendJson(res, runOnPipeline(shared, [&] {
-                     advance = true;
-                     return Reply{200, "{}"};
-                 }));
+        onPipeline(res, [&] {
+            advance = true;
+            return Reply{200, "{}"};
+        });
     });
 
     http.Put("/api/settings", [&](const httplib::Request& req, httplib::Response& res) {
         double value = 0;
-        if (!extractNumber(req.body, "unknownThreshold", value) || value <= 0) {
-            sendJson(res, {400, jsonError("unknownThreshold must be a positive number")});
-            return;
-        }
-        sendJson(res, runOnPipeline(shared, [&, value] {
-                     cutoffs[metric] = value;  // applies to the metric currently selected
-                     return Reply{200, cv::format(R"({"unknownThreshold":%.3f})", value)};
-                 }));
+        extractNumber(req.body, "unknownThreshold", value);
+        onPipeline(res, [&, value] { return session.setCutoff(value); });
     });
 
     http.Put("/api/classifier", [&](const httplib::Request& req, httplib::Response& res) {
-        std::string nextClassifier, nextMetric;
-        if (!extractString(req.body, "classifier", nextClassifier) ||
-            (nextClassifier != "features" && nextClassifier != "resnet18")) {
-            sendJson(res, {400, jsonError("classifier must be features or resnet18")});
-            return;
-        }
-        const bool hasMetric = extractString(req.body, "metric", nextMetric);
-        if (!hasMetric) nextMetric = nextClassifier == "resnet18" ? "cosine" : "scaled-euclidean";
-        const bool valid = nextClassifier == "features"
-                               ? nextMetric == "scaled-euclidean"
-                               : nextMetric == "cosine" || nextMetric == "ssd";
-        if (!valid) {
-            sendJson(res, {400, jsonError("features uses scaled-euclidean; resnet18 uses cosine "
-                                          "or ssd")});
-            return;
-        }
-        sendJson(res, runOnPipeline(shared, [&, nextClassifier, nextMetric] {
-                     if (nextClassifier == "resnet18" && !embedder)
-                         return Reply{409, jsonError("ResNet18 model not found at " + kModelPath)};
-                     classifier = nextClassifier;
-                     metric = nextMetric;
-                     // A prompt raised under the other classifier's notion of "unknown" is stale.
-                     autoLearn = AutoLearn{};
-                     return Reply{200, R"({"classifier":")" + classifier + R"(","metric":")" +
-                                           metric + "\"}"};
-                 }));
+        std::string classifier, metric;
+        extractString(req.body, "classifier", classifier);
+        extractString(req.body, "metric", metric);  // optional: "" = the classifier's default
+        onPipeline(res, [&, classifier, metric] { return session.setClassifier(classifier, metric); });
     });
 
     http.Put("/api/mode", [&](const httplib::Request& req, httplib::Response& res) {
         std::string next;
-        if (!extractString(req.body, "mode", next) ||
-            (next != "detect" && next != "collect" && next != "evaluate")) {
-            sendJson(res, {400, jsonError("mode must be detect, collect, or evaluate")});
-            return;
-        }
-        sendJson(res, runOnPipeline(shared, [&, next] {
-                     mode = next;
-                     autoLearn =
-                         AutoLearn{};  // a half-finished prompt makes no sense in another mode
-                     return Reply{200, R"({"mode":")" + mode + "\"}"};
-                 }));
+        extractString(req.body, "mode", next);
+        onPipeline(res, [&, next] { return session.setMode(next); });
     });
 
     http.Post("/api/autolearn/label", [&](const httplib::Request& req, httplib::Response& res) {
         std::string name;
-        if (!extractString(req.body, "label", name) || !isValidLabel(name)) {
-            sendJson(res, {400, jsonError("label must be 1-64 chars of [A-Za-z0-9_-]")});
-            return;
-        }
-        sendJson(res, runOnPipeline(shared, [&, name] {
-                     if (!autoLearn.startCollecting(name))
-                         return Reply{409, jsonError("no unknown object is waiting for a label")};
-                     return Reply{200, R"({"collecting":")" + name + "\"}"};
-                 }));
+        extractString(req.body, "label", name);
+        onPipeline(res, [&, name] { return session.autoLearnLabel(name); });
     });
 
     http.Post("/api/autolearn/dismiss", [&](const httplib::Request&, httplib::Response& res) {
-        sendJson(res, runOnPipeline(shared, [&] {
-                     autoLearn.dismiss();
-                     return Reply{200, "{}"};
-                 }));
+        onPipeline(res, [&] { return session.autoLearnDismiss(); });
     });
 
     http.Get("/api/eval", [&](const httplib::Request&, httplib::Response& res) {
-        sendJson(res, runOnPipeline(shared, [&] { return Reply{200, matrixJson()}; }));
+        onPipeline(res, [&] { return session.evalMatrix(); });
     });
 
-    // The task's evaluation hook: the user states the true label, the system tallies its guess.
     http.Post("/api/eval/record", [&](const httplib::Request&, httplib::Response& res) {
-        sendJson(res, runOnPipeline(shared, [&] {
-                     if (label.empty()) return Reply{409, jsonError("set the true label first")};
-                     if (currentPrediction.empty())
-                         return Reply{409, jsonError("no object detected")};
-                     liveMatrix.add(label, currentPrediction);
-                     if (persist) {
-                         fs::create_directories("out/eval");
-                         std::ofstream("out/eval/live_confusion.md") << liveMatrix.toMarkdown();
-                         std::ofstream("out/eval/live_confusion.csv") << liveMatrix.toCsv();
-                     }
-                     return Reply{200, matrixJson()};
-                 }));
+        onPipeline(res, [&] { return session.evalRecord(); });
     });
 
     http.Delete("/api/eval", [&](const httplib::Request&, httplib::Response& res) {
-        sendJson(res, runOnPipeline(shared, [&] {
-                     liveMatrix = orec::ConfusionMatrix{};
-                     return Reply{200, matrixJson()};
-                 }));
+        onPipeline(res, [&] { return session.evalReset(); });
     });
 
     // Loopback unless --public: locally the API writes files and deletes DB rows, so it must
@@ -609,14 +405,13 @@ int main(int argc, char** argv) {
         }
     });
     std::cout << "serving on http://" << host << ":" << port << (isPublic ? " [public]" : "")
-              << "  (source: " << spec
-              << ", db: " << db.size() << " samples)" << std::endl;
+              << "  (source: " << spec << ", ResNet18: " << (embedder ? "on" : "off") << ")"
+              << std::endl;
     if (browser)
         std::cout << "waiting for the GUI camera on ws://127.0.0.1:" << port << "/ws/frames"
                   << std::endl;
 
     const std::vector<int> jpegParams = {cv::IMWRITE_JPEG_QUALITY, 80};
-    double fps = 0.0;
     auto lastTick = std::chrono::steady_clock::now();
 
     const auto runCommands = [&] {
@@ -627,51 +422,12 @@ int main(int argc, char** argv) {
         }
         for (auto& [fn, promise] : pending) promise.set_value(fn());
     };
-
-    // The last processed frame's classification; outlives the frame so idle ticks can still
-    // report it.
-    bool canClassify = false;
-    orec::Match match{};
-    auto frameTime = AutoLearn::Clock::now();
-
     const auto statusJson = [&] {
-        std::ostringstream status;
-        status << R"({"mode":")" << mode << R"(","threshold":)" << result.threshold
-               << R"(,"label":")" << jsonEscape(label) << R"(","source":")"
-               << jsonEscape(sourceName()) << R"(","still":)" << (isStill() ? "true" : "false")
-               << R"(,"browser":)" << (browser ? "true" : "false") << R"(,"dbSize":)" << db.size()
-               << R"(,"public":)" << (isPublic ? "true" : "false")
-               << R"(,"embedDbSize":)" << embedDb.size() << R"(,"classifier":")" << classifier
-               << R"(","metric":")" << metric << R"(","resnetAvailable":)"
-               << (embedder ? "true" : "false") << R"(,"unknownThreshold":)" << cutoffs[metric]
-               << R"(,"fps":)"
-               << cv::format("%.1f", fps) << R"(,"autoLearn":{"state":")"
-               << toString(autoLearn.state()) << R"(","progress":)"
-               << cv::format("%.2f", autoLearn.holdProgress(frameTime)) << R"(,"label":")"
-               << jsonEscape(autoLearn.label()) << R"(","collected":)" << autoLearn.collected()
-               << R"(,"target":)" << autoLearn.targetSamples() << R"(,"phase":")"
-               << (autoLearn.awaitingMove() ? "move" : "hold") << R"("},"object":)";
-        if (result.hasFeatures) {
-            status << R"({"features":{)";
-            for (size_t i = 0; i < result.features.values.size(); ++i)
-                status << (i ? "," : "") << '"' << orec::kFeatureNames[i]
-                       << "\":" << result.features.values[i];
-            status << R"(},"prediction":)";
-            if (canClassify) {
-                status << R"({"label":")" << jsonEscape(match.label) << R"(","distance":)"
-                       << match.distance << R"(,"known":)" << (match.known ? "true" : "false")
-                       << "}";
-            } else {
-                status << "null";
-            }
-            status << "}";
-        } else {
-            status << "null";
-        }
-        status << "}";
-        return status.str();
+        return session.statusJson({sourceName(), isStill(), browser, isPublic, fps});
     };
 
+    cv::Mat frame;
+    std::vector<double> embedding;
     while (shared.running) {
         if (browser) {
             // No new frame = camera stopped or not started. Keep answering the API, but don't
@@ -697,61 +453,17 @@ int main(int argc, char** argv) {
         }
         if (frame.empty()) break;
 
-        runPipeline(frame, result);
-        embeddingFresh = false;
-        frame.copyTo(display);
-        colorizeRegions(result.regionMap, regionsVis);
-        frameTime = AutoLearn::Clock::now();
-
-        // Classify once per frame; status, auto-learn, and evaluation all reuse it.
-        match = orec::Match{};
-        const double cutoff = cutoffs[metric];
-        if (classifier == "resnet18") {
-            const auto* e = currentEmbedding();
-            canClassify = e && embedDb.size() >= 2;
-            if (canClassify)
-                match = metric == "ssd" ? orec::classifySsd(embedDb, *e, cutoff)
-                                        : orec::classifyCosine(embedDb, *e, cutoff);
-        } else {
-            canClassify = result.hasFeatures && db.size() >= 2;
-            if (canClassify)
-                match = orec::classifyNearest(db, stdevs, result.features.values, cutoff);
-        }
-        // With fewer than 2 samples nothing can be recognised, so every object counts as
-        // unknown: that is what lets auto-learn bootstrap an empty DB.
-        const bool unknown = result.hasFeatures && (!canClassify || !match.known);
-        currentPrediction = !result.hasFeatures ? "" : unknown ? "unknown" : match.label;
-
-        if (mode == "detect") {
-            const double diagonal = std::hypot(frame.cols, frame.rows);
-            autoLearn.update(result.hasFeatures, unknown, result.features.centroid,
-                             result.features.theta, diagonal, frameTime);
-            if (result.hasFeatures && autoLearn.wantsSample(frameTime)) {
-                addSample(autoLearn.label());  // before sampleTaken: the last pose clears it
-                autoLearn.sampleTaken(result.features.centroid, result.features.theta);
-            }
-        }
-
-        if (result.hasFeatures) {
-            std::string text = canClassify ? currentPrediction : "object";
-            if (autoLearn.state() == AutoLearn::State::Tracking)
-                text = cv::format("unknown %.1fs",
-                                  autoLearn.holdProgress(frameTime) * autoLearn.holdSeconds());
-            else if (autoLearn.state() == AutoLearn::State::Prompt)
-                text = "unknown: name me";
-            else if (autoLearn.state() == AutoLearn::State::Collecting)
-                text = cv::format("%s %d/%d: %s", autoLearn.label().c_str(), autoLearn.collected(),
-                                  autoLearn.targetSamples(),
-                                  autoLearn.awaitingMove() ? "move or rotate" : "hold still");
-            drawFeatures(display, result.features, text);
-        }
+        session.process(frame, Session::Clock::now());
+        const bool embedded = session.needsEmbedding() && embedder;
+        if (embedded) embedder->embed(session.roi(), embedding);
+        session.finish(embedded ? &embedding : nullptr);
 
         cv::Mat thresholdBgr;
-        cv::cvtColor(result.binary, thresholdBgr, cv::COLOR_GRAY2BGR);
+        cv::cvtColor(session.result().binary, thresholdBgr, cv::COLOR_GRAY2BGR);
         std::map<std::string, std::vector<uchar>> encoded;
-        cv::imencode(".jpg", display, encoded["annotated"], jpegParams);
+        cv::imencode(".jpg", session.annotated(), encoded["annotated"], jpegParams);
         cv::imencode(".jpg", thresholdBgr, encoded["threshold"], jpegParams);
-        cv::imencode(".jpg", regionsVis, encoded["regions"], jpegParams);
+        cv::imencode(".jpg", session.regionsView(), encoded["regions"], jpegParams);
 
         {
             std::lock_guard lock(shared.m);
