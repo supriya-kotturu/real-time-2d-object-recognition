@@ -6,7 +6,7 @@ Rules:
 - **−1** — a hint already given (listed in `hints.md`) has to be given again.
 - Progress update every 6h of active work. Measured from the `Last update` timestamp below; checked at the start of every session.
 
-**Total: +9**
+**Total: +10**
 **Last update:** 2026-10-24 ~18:00 (checkpoint 2). Next one due after 6 more hours of work.
 
 ## Ledger
@@ -57,6 +57,7 @@ Rules:
 | 2026-10-24 | −1 | H-45 repeated: local distance Mat put inside grassfire instead of shrink/grow; grassfire's own output became CV_8UC1 | H-45 |
 | 2026-10-24 | +1 | shrink comparison fixed to `<= n` by checking it against the test case (awarded in session, logged late at checkpoint 2) | D-05 |
 | 2026-10-24 | +1 | Session 2: caught on your own that a browser→server.exe design has no home on Netlify ("where will the camera server be?"), i.e. applied the D-13 WebRTC objection unprompted | D-24 |
+| 2026-10-24 | +1 | Proposed running the model in a Web Worker with no server (H-03 applied unprompted, back to your own D-03 plan) when hosting got expensive; it became D-27 and shipped. Pipeline half was missing (probe still open) | D-27 |
 
 ## Progress updates
 
