@@ -365,3 +365,8 @@ Commits `f645167` (Session extracted from server.exe), `ea6729d` (C++ → WebAss
 **Speed in the browser:** hand features ~10 fps; ResNet18 ~3.6 fps (~270 ms/frame, single-threaded wasm; threads would need COOP/COEP, H-09).
 **Deployed (draft):** https://6add760903fe7c39632e08fc--real-time-object-recognition.netlify.app, verified with headless Chrome (samples correct under ResNet18). Production URL waits for main (your review), via GitHub-connected builds.
 **Superseded:** the HF Space plan (D-26 hosting; Docker Spaces need PRO). `server --public`, the Dockerfile and `--allow-origin` remain for self-hosting.
+
+### Report finding: phone test (2026-10-24, night, deployed build)
+
+A phone (not in the DB) was labelled "ball"/"cloud". Your diagnosis from the Threshold/Regions views: saturation darkening (D-22) makes the hand foreground; hand + phone form one region that touches the border, so T3 drops it (D-08); the camera module (a dark disc inside a lighter ring) becomes the primary region. Its ResNet18 distance (~0.35-0.375) straddles the cosine cutoff (0.35), so the label flickers between ball, cloud and unknown. NN is closed-set: it can only say a DB label or "unknown".
+Fixes: demo protocol (object on paper, hands out of frame: the task's assumption); auto-learn the phone (extension demo); optionally a stricter cutoff (~0.30, costs false unknowns: one-shot correct matches reach 0.36).
