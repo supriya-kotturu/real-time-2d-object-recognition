@@ -33,6 +33,7 @@ add_library(objrec_core STATIC
 	src/core/features.cpp
 	src/core/classifier.cpp
 	src/core/evaluation.cpp
+	src/core/preprocess.cpp
 )
 target_include_directories(objrec_core PUBLIC "${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(objrec_core PUBLIC opencv_core opencv_imgproc)

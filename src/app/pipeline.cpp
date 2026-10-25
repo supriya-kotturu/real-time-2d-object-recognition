@@ -3,6 +3,7 @@
 #include <opencv2/imgproc.hpp>
 
 #include "core/morphology.h"
+#include "core/preprocess.h"
 #include "core/threshold.h"
 
 namespace orec = objectrecognition;
@@ -14,10 +15,14 @@ constexpr int kMaxRegions = 5;
 constexpr orec::Connectivity kConn = orec::Connectivity::Eight;
 constexpr int kCloseN = 2;
 constexpr int kOpenN = 1;
+// Full strength: a fully saturated pixel goes to black (D-22).
+constexpr double kSaturationStrength = 1.0;
 }  // namespace
 
 void runPipeline(const cv::Mat& frame, FrameResult& r) {
-    cv::cvtColor(frame, r.gray, cv::COLOR_BGR2GRAY);
+    // Task 1 pre-processing: coloured objects (pink towel, orange ball) sit close to the paper
+    // in plain grayscale; darkening by saturation separates them without darkening shadows.
+    orec::saturationDarken(frame, kSaturationStrength, r.gray);
     r.threshold = orec::isodataThreshold(r.gray);
     orec::applyThreshold(r.gray, r.threshold, r.binary);
 

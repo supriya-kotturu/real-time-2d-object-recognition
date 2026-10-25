@@ -28,6 +28,7 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 | D-19 | 2026-10-24 | Model delivery for the Netlify (browser) version | AGENT (you architect) | decided: build-time fetch + cache (LFS question open) |
 | D-20 | 2026-10-24 | T2 grassfire body written by agent from your pseudocode | AGENT (your design) | decided; explain-it-back pending |
 | D-21 | 2026-10-24 | T2 cleanup parameters | you | proposed: close 2 / open 1, 8-conn |
+| D-22 | 2026-10-24 | Saturation pre-processing for coloured objects | AGENT | decided, built (option C) |
 | D-05 | 2026-10-23 | Headless tests + 4/8-conn visual dump for from-scratch stages | AGENT harness, HAND expected values | decided |
 
 ---
@@ -280,3 +281,11 @@ Working: IP Webcam (Android) → `./out/live.exe "http://USER:PASS@<ip>:8080/vid
 **Your decision:** in shrink, outside-the-image counts as **far** (the same as grow; matches `cv::erode`). Objects touching the edge stay touching. `grassfire()` itself still reports the border-as-bg distance.
 **Guard:** regression test "shrink 1 keeps an edge-touching object touching the edge"; mutation-checked (fails with the old policy).
 **Data:** you deleted the cut-off capture `mouse/20261024-153855-956.png`.
+
+## D-22 — Saturation pre-processing (Task 1 suggestion)
+
+**Context:** 2026-10-24 audit. Several objects are coloured, not dark (orange ball, pink towel/sticky notes, tan notebook, orange battery band), so plain grayscale only segmented their dark text or shadows. Replacement objects aren't available (shared studio).
+**Decision:** option C: saturation darkening first (`out = V·(1 − S)`; paper and shadows have S≈0 and keep their brightness), then replace only what still fails.
+**Before → after:** batteries, sticky notes and notebook text-only segmentations are gone; ball hu1 0.178 → 0.168 (a disc is 0.159, so now it's the whole ball, not ball + shadow).
+**Rejected:** 5 mouse (1080p, too close, touch edge), notebook ×2 (opened / touches edge). See `data/rejected/README.md`.
+**Known limitations (report material):** (1) squares/discs have no defined least-moment axis, so their OBB tilts arbitrarily and percentFilled varies (sticky notes 0.66); (2) articulated objects (keychain ring, spectacle legs) change silhouette per pose; (3) 7 of 10 objects are blob-like (hu1 ≈ 0.17–0.20), so expect confusion among them. That's the "impact of adding objects" discussion the extension asks for.
