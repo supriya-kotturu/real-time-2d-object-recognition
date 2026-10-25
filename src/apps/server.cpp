@@ -143,6 +143,16 @@ void sendJson(httplib::Response& res, const Reply& reply) {
     res.set_content(reply.body, "application/json");
 }
 
+// Loopback binding doesn't stop other websites: a page on evil.example can still make the
+// user's browser POST to 127.0.0.1 (as a CORS "simple" request) or open a WebSocket, which
+// CORS doesn't cover at all. Browsers always send Origin on those, so only the GUI's own
+// origin is let through; requests without Origin (curl, <img> stream loads) are not cross-site.
+bool isAllowedOrigin(const httplib::Request& req) {
+    if (!req.has_header("Origin")) return true;
+    static const std::regex local(R"(^http://(localhost|127\.0\.0\.1)(:[0-9]{1,5})?$)");
+    return std::regex_match(req.get_header_value("Origin"), local);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -165,6 +175,13 @@ int main(int argc, char** argv) {
     Shared shared;
     FrameMailbox mailbox;
     httplib::Server http;
+
+    // Runs before routing and before WebSocket upgrades.
+    http.set_pre_routing_handler([](const httplib::Request& req, httplib::Response& res) {
+        if (isAllowedOrigin(req)) return httplib::Server::HandlerResponse::Unhandled;
+        sendJson(res, {403, jsonError("origin not allowed")});
+        return httplib::Server::HandlerResponse::Handled;
+    });
 
     // One connection per camera tab. The ack is sent only after the pipeline took the frame,
     // so a client that waits for it never has more than one frame in flight (H-50).
