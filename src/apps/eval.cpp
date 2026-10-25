@@ -1,14 +1,17 @@
 // T7 + T9 comparison: confusion matrices over labelled images (data/objects/<label>/*.png).
-// Usage: eval [objects-dir] [--one-shot | --db features.csv] [--unknown X] [--model m.onnx]
+// Usage: eval [test-dir] [--train dir] [--one-shot | --db features.csv] [--unknown X]
+//             [--model m.onnx]
 //
 // Protocols (D-14):
 //   default     leave-one-out: each image vs a DB of every *other* image, so all captures are
 //               test data and nothing is matched against itself.
 //   --one-shot  Task 9: the first image of each label is the whole DB; the rest are tests.
 //   --db        every image vs a fixed hand-feature DB (e.g. trained interactively in live).
+//   --train     Task 7/9 split: the DB comes from a separate training folder (every image, or
+//               with --one-shot just the first per label); every test-dir image is a test.
 // When the ResNet18 model exists, the embedding classifier (cosine) runs on the same split,
 // so the two methods are compared on identical data.
-// Writes out/eval/confusion_{features,embedding}.{md,csv} and lists misclassified files.
+// Writes out/eval/confusion_<method>_<protocol>.{md,csv} and lists misclassified files.
 
 #include <filesystem>
 #include <fstream>
@@ -41,31 +44,39 @@ using Classify =
     std::function<orec::Match(const std::vector<orec::Sample>&, const std::vector<double>&)>;
 using Pick = std::function<const std::vector<double>&(const Item&)>;
 
-void report(const std::string& name, const orec::ConfusionMatrix& m,
+void report(const std::string& name, const std::string& protocol, const orec::ConfusionMatrix& m,
             const std::vector<std::string>& mistakes) {
     const fs::path out = "out/eval";
     fs::create_directories(out);
-    std::ofstream(out / ("confusion_" + name + ".md")) << m.toMarkdown();
-    std::ofstream(out / ("confusion_" + name + ".csv")) << m.toCsv();
-    std::cout << "\n## " << name << "\n\n" << m.toMarkdown();
+    const std::string stem = "confusion_" + name + "_" + protocol;
+    std::ofstream(out / (stem + ".md")) << m.toMarkdown();
+    std::ofstream(out / (stem + ".csv")) << m.toCsv();
+    std::cout << "\n## " << name << " (" << protocol << ")\n\n" << m.toMarkdown();
     for (const auto& s : mistakes) std::cout << "  miss: " << s << "\n";
 }
 
-void run(const std::string& name, const std::vector<Item>& items, const std::string& protocol,
-         const std::vector<orec::Sample>& fixedDb, const Pick& pick, const Classify& classify) {
+void run(const std::string& name, const std::vector<Item>& items, const std::vector<Item>& train,
+         const std::string& protocol, const std::vector<orec::Sample>& fixedDb, const Pick& pick,
+         const Classify& classify) {
     orec::ConfusionMatrix matrix;
     std::vector<std::string> mistakes;
 
-    // One-shot: the first image of each label (items are sorted) forms the DB.
-    std::vector<orec::Sample> oneShotDb;
+    // One-shot: the first image of each label (items are sorted) forms the DB. With a separate
+    // training folder the exemplars come from there, so no test image is ever excluded.
+    const std::vector<Item>& source = train.empty() ? items : train;
+    std::vector<orec::Sample> oneShotDb, trainDb;
     std::map<std::string, size_t> exemplar;
-    for (size_t i = 0; i < items.size(); ++i)
-        if (exemplar.emplace(items[i].label, i).second)
-            oneShotDb.push_back({items[i].label, pick(items[i])});
+    for (size_t i = 0; i < source.size(); ++i) {
+        if (exemplar.emplace(source[i].label, i).second)
+            oneShotDb.push_back({source[i].label, pick(source[i])});
+        trainDb.push_back({source[i].label, pick(source[i])});
+    }
 
     for (size_t i = 0; i < items.size(); ++i) {
         std::vector<orec::Sample> db;
-        if (protocol == "loo") {
+        if (!train.empty()) {
+            db = protocol == "split-one-shot" ? oneShotDb : trainDb;
+        } else if (protocol == "loo") {
             for (size_t j = 0; j < items.size(); ++j)
                 if (j != i) db.push_back({items[j].label, pick(items[j])});
         } else if (protocol == "one-shot") {
@@ -81,7 +92,7 @@ void run(const std::string& name, const std::vector<Item>& items, const std::str
             mistakes.push_back(items[i].file + "  (" + items[i].label + " -> " + predicted +
                                cv::format(", d=%.3f)", match.distance));
     }
-    report(name, matrix, mistakes);
+    report(name, protocol, matrix, mistakes);
 }
 
 }  // namespace
@@ -89,7 +100,8 @@ void run(const std::string& name, const std::vector<Item>& items, const std::str
 int main(int argc, char** argv) {
     cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_WARNING);
 
-    std::string root = "data/objects", dbPath, modelPath = "data/models/resnet18-v2-7.onnx";
+    std::string root = "data/objects", trainRoot, dbPath;
+    std::string modelPath = "data/models/resnet18-v2-7.onnx";
     std::string protocol = "loo";
     double unknownThreshold = std::numeric_limits<double>::infinity();
     for (int i = 1; i < argc; ++i) {
@@ -97,6 +109,8 @@ int main(int argc, char** argv) {
         if (arg == "--db" && i + 1 < argc) {
             dbPath = argv[++i];
             protocol = "db";
+        } else if (arg == "--train" && i + 1 < argc) {
+            trainRoot = argv[++i];
         } else if (arg == "--one-shot") {
             protocol = "one-shot";
         } else if (arg == "--unknown" && i + 1 < argc) {
@@ -114,23 +128,29 @@ int main(int argc, char** argv) {
     else
         std::cout << "(no model at " << modelPath << ": embedding comparison skipped)\n";
 
-    std::vector<Item> items;
-    FrameResult r;
-    cv::Mat roi;
-    for (const auto& img : listLabeledImages(root)) {
-        const cv::Mat frame = cv::imread(img.path.string(), cv::IMREAD_COLOR);
-        if (frame.empty()) continue;
-        runPipeline(frame, r);
-        if (!r.hasFeatures) {
-            std::cout << "skip (no object): " << img.path.string() << "\n";
-            continue;
+    const auto load = [&](const std::string& dir) {
+        std::vector<Item> out;
+        FrameResult r;
+        cv::Mat roi;
+        for (const auto& img : listLabeledImages(dir)) {
+            const cv::Mat frame = cv::imread(img.path.string(), cv::IMREAD_COLOR);
+            if (frame.empty()) continue;
+            runPipeline(frame, r);
+            if (!r.hasFeatures) {
+                std::cout << "skip (no object): " << img.path.string() << "\n";
+                continue;
+            }
+            Item item{img.label, img.path.string(), r.features.values, {}};
+            if (embedder &&
+                extractAlignedRoi(frame, r.regionMap, r.regions[r.primary].id, r.features, roi))
+                embedder->embed(roi, item.embedding);
+            out.push_back(std::move(item));
         }
-        Item item{img.label, img.path.string(), r.features.values, {}};
-        if (embedder &&
-            extractAlignedRoi(frame, r.regionMap, r.regions[r.primary].id, r.features, roi))
-            embedder->embed(roi, item.embedding);
-        items.push_back(std::move(item));
-    }
+        return out;
+    };
+    const std::vector<Item> items = load(root);
+    const std::vector<Item> train = trainRoot.empty() ? std::vector<Item>{} : load(trainRoot);
+    if (!trainRoot.empty()) protocol = protocol == "one-shot" ? "split-one-shot" : "split";
     if (items.size() < 3) {
         std::cerr << "need at least 3 usable images under " << root << "\n";
         return 1;
@@ -144,10 +164,12 @@ int main(int argc, char** argv) {
             return 1;
         }
     }
-    std::cout << "protocol: " << protocol << ", " << items.size() << " images\n";
+    std::cout << "protocol: " << protocol << ", " << items.size() << " test images";
+    if (!train.empty()) std::cout << ", " << train.size() << " training images";
+    std::cout << "\n";
 
     run(
-        "features", items, protocol, fixedDb,
+        "features", items, train, protocol, fixedDb,
         [](const Item& it) -> const std::vector<double>& { return it.features; },
         [&](const std::vector<orec::Sample>& db, const std::vector<double>& f) {
             return orec::classifyNearest(db, orec::featureStdevs(db), f, unknownThreshold);
@@ -156,7 +178,7 @@ int main(int argc, char** argv) {
     // A fixed hand-feature DB has no embeddings, so that protocol compares features only.
     if (embedder && protocol != "db") {
         run(
-            "embedding", items, protocol, {},
+            "embedding", items, train, protocol, {},
             [](const Item& it) -> const std::vector<double>& { return it.embedding; },
             [&](const std::vector<orec::Sample>& db, const std::vector<double>& e) {
                 return orec::classifyCosine(db, e, unknownThreshold);

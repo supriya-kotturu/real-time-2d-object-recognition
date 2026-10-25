@@ -29,6 +29,7 @@ Status: `open` → `decided` → (`superseded by D-xx`).
 | D-20 | 2026-10-24 | T2 grassfire body written by agent from your pseudocode | AGENT (your design) | decided; explain-it-back pending |
 | D-21 | 2026-10-24 | T2 cleanup parameters | you | proposed: close 2 / open 1, 8-conn |
 | D-22 | 2026-10-24 | Saturation pre-processing for coloured objects | AGENT | decided, built (option C) |
+| D-23 | 2026-10-24 | First evaluation results (T7 + T9) | — | recorded |
 | D-05 | 2026-10-23 | Headless tests + 4/8-conn visual dump for from-scratch stages | AGENT harness, HAND expected values | decided |
 
 ---
@@ -289,3 +290,15 @@ Working: IP Webcam (Android) → `./out/live.exe "http://USER:PASS@<ip>:8080/vid
 **Before → after:** batteries, sticky notes and notebook text-only segmentations are gone; ball hu1 0.178 → 0.168 (a disc is 0.159, so now it's the whole ball, not ball + shadow).
 **Rejected:** 5 mouse (1080p, too close, touch edge), notebook ×2 (opened / touches edge). See `data/rejected/README.md`.
 **Known limitations (report material):** (1) squares/discs have no defined least-moment axis, so their OBB tilts arbitrarily and percentFilled varies (sticky notes 0.66); (2) articulated objects (keychain ring, spectacle legs) change silhouette per pose; (3) 7 of 10 objects are blob-like (hu1 ≈ 0.17–0.20), so expect confusion among them. That's the "impact of adding objects" discussion the extension asks for.
+
+## D-23 — First evaluation results (2026-10-24 ~17:30)
+
+Data: 58 training images (10 labels) in `data/objects/`; 37 usable test images (8 labels: keychain and spects test captures missing) in `data/test/`. Test outliers kept on purpose: curating a test set by hardness inflates accuracy.
+
+| Protocol | Hand features (scaled Euclidean NN) | ResNet18 embedding (cosine NN) |
+|---|---|---|
+| split: DB = data/objects, test = data/test (T7) | 18/37 = 48.6% | 37/37 = 100% |
+| split one-shot: 1 image/label as DB (T9) | 13/37 = 35.1% | 34/37 = 91.9% |
+| leave-one-out over data/objects | 32/58 = 55.2% | 57/58 = 98.3% |
+
+**Reading:** distinct silhouettes (toy-car, sticky-notes, notebook, mouse) are recognised; the blob-like objects (ball, batteries, cloud, towel) are not. Ball → sticky-notes 4/6: disc and square both lack a defined least-moment axis, so their OBB features coincide. The embedding wins because it sees colour and texture, which the 5 shape features ignore by design. Matrices: `out/eval/confusion_*_{split,split-one-shot,loo}.md`.
