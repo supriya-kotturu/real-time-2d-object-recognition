@@ -140,4 +140,47 @@ EMSCRIPTEN_KEEPALIVE const char* orec_command(const char* name, const char* a, c
 
 EMSCRIPTEN_KEEPALIVE int orec_last_status() { return lastStatus; }
 
+// --- D-28: samples survive a refresh. JS stores what was added (IndexedDB) and imports it back.
+
+EMSCRIPTEN_KEEPALIVE int orec_added_count() { return session->samplesAdded(); }
+
+EMSCRIPTEN_KEEPALIVE const char* orec_added_label() { return hold(session->lastAdded().label); }
+
+EMSCRIPTEN_KEEPALIVE int orec_added_features_len() {
+    return static_cast<int>(session->lastAdded().features.size());
+}
+EMSCRIPTEN_KEEPALIVE const double* orec_added_features() {
+    return session->lastAdded().features.data();
+}
+
+// Null when the sample was added without an embedding (ResNet18 not loaded yet).
+EMSCRIPTEN_KEEPALIVE const double* orec_added_embedding() {
+    const auto& e = session->lastAdded().embedding;
+    return e.size() == kEmbeddingSize ? e.data() : nullptr;
+}
+
+// The crop it learned from, scaled so its longer side is maxSide; RGBA. Null if none.
+EMSCRIPTEN_KEEPALIVE unsigned char* orec_added_thumb(int maxSide) {
+    const cv::Mat& roi = session->lastAdded().roi;
+    if (roi.empty()) return nullptr;
+    const double scale = static_cast<double>(maxSide) / std::max(roi.cols, roi.rows);
+    cv::Mat small;
+    cv::resize(roi, small, cv::Size(), std::min(1.0, scale), std::min(1.0, scale), cv::INTER_AREA);
+    cv::cvtColor(small, view, cv::COLOR_BGR2RGBA);
+    return view.data;
+}
+EMSCRIPTEN_KEEPALIVE int orec_thumb_width() { return view.cols; }
+EMSCRIPTEN_KEEPALIVE int orec_thumb_height() { return view.rows; }
+
+EMSCRIPTEN_KEEPALIVE void orec_import(const char* label, const double* features, int n,
+                                      const float* embedding) {
+    const std::vector<double> f(features, features + n);
+    if (!embedding) {
+        session->importSample(label, f, nullptr);
+        return;
+    }
+    const auto e = toDoubles(embedding);
+    session->importSample(label, f, &e);
+}
+
 }  // extern "C"

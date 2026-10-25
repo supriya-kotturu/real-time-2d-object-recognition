@@ -6,7 +6,7 @@ Rules:
 - **−1** — a hint already given (listed in `hints.md`) has to be given again.
 - Progress update every 6h of active work. Measured from the `Last update` timestamp below; checked at the start of every session.
 
-**Total: +12**
+**Total: +13**
 **Last update:** 2026-10-24 ~18:00 (checkpoint 2). Next one due after 6 more hours of work.
 
 ## Ledger
@@ -60,6 +60,7 @@ Rules:
 | 2026-10-24 | +1 | Proposed running the model in a Web Worker with no server (H-03 applied unprompted, back to your own D-03 plan) when hosting got expensive; it became D-27 and shipped. Pipeline half was missing (probe still open) | D-27 |
 | 2026-10-24 | +1 | Live test: noticed the OBB sat on the phone's camera module, not the phone, i.e. the error was segmentation (T1/T3), not classification | T3 |
 | 2026-10-24 | +1 | Explained the failure chain from the Threshold/Regions views: hand merged with the phone, touched the border, region rejected, camera ring won (answers the T3 explain-it-back check) | T3, D-08 |
+| 2026-10-24 | +1 | Theme review: asked whether the lime box stays visible on the bright paper before it shipped (it would not: led to the halo overlay) | D-28 |
 
 ## Progress updates
 

@@ -128,6 +128,18 @@ void Session::addSample(const std::string& name, const std::vector<double>* embe
         if (config_.persist) appendSample(config_.embedDbPath, embedded);
         embedDb_.push_back(embedded);
     }
+    lastAdded_.label = name;
+    lastAdded_.features = result_.features.values;
+    lastAdded_.embedding = embedding ? *embedding : std::vector<double>{};
+    if (!currentRoi(lastAdded_.roi)) lastAdded_.roi.release();
+    ++samplesAdded_;
+}
+
+void Session::importSample(const std::string& label, const std::vector<double>& features,
+                           const std::vector<double>* embedding) {
+    db_.push_back({label, features});
+    stdevs_ = orec::featureStdevs(db_);
+    if (embedding && !embedding->empty()) embedDb_.push_back({label, *embedding});
 }
 
 std::string Session::statusJson(const StatusExtras& extras) const {

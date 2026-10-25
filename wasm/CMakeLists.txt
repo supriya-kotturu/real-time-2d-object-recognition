@@ -43,7 +43,7 @@ target_link_options(objrec PRIVATE
 	-sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createObjrec
 	-sENVIRONMENT=web,worker,node
 	-sALLOW_MEMORY_GROWTH=1
-	-sEXPORTED_RUNTIME_METHODS=FS,UTF8ToString,stringToNewUTF8,HEAPU8,HEAPF32
+	-sEXPORTED_RUNTIME_METHODS=FS,UTF8ToString,stringToNewUTF8,HEAPU8,HEAPF32,HEAPF64
 	-sEXPORTED_FUNCTIONS=_malloc,_free
 )
 set_target_properties(objrec PROPERTIES SUFFIX ".mjs")

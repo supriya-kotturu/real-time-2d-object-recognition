@@ -36,6 +36,15 @@ struct SessionConfig {
     std::string metric = "scaled-euclidean";
 };
 
+// The most recent sample added by Train or auto-learn, for transports that store samples
+// themselves (the browser build keeps them in IndexedDB so they survive a refresh, D-28).
+struct AddedSample {
+    std::string label;
+    std::vector<double> features;
+    std::vector<double> embedding;  // empty when none was available
+    cv::Mat roi;                    // the crop it learned from (BGR); may be empty
+};
+
 // Facts about the frame source that only the transport knows.
 struct StatusExtras {
     std::string source;
@@ -69,6 +78,14 @@ class Session {
     const std::string& label() const { return label_; }
     bool embeddingAvailable() const { return config_.embeddingAvailable; }
     void setEmbeddingAvailable(bool available) { config_.embeddingAvailable = available; }
+
+    // Counts every sample added since construction; compare to notice new ones.
+    int samplesAdded() const { return samplesAdded_; }
+    const AddedSample& lastAdded() const { return lastAdded_; }
+
+    // Puts a previously stored sample back into the DBs (memory only, never written to disk).
+    void importSample(const std::string& label, const std::vector<double>& features,
+                      const std::vector<double>* embedding);
 
     // --- Commands: validated here, so every transport enforces the same rules. ---
     Reply db() const;
@@ -109,4 +126,6 @@ class Session {
     bool canClassify_ = false;
     objectrecognition::Match match_{};
     std::string currentPrediction_;  // this frame's label, "unknown", or "" with no object
+    int samplesAdded_ = 0;
+    AddedSample lastAdded_;
 };

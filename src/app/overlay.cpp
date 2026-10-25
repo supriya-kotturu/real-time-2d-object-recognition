@@ -36,13 +36,24 @@ void colorizeRegions(const cv::Mat& regionMap, cv::Mat& dst) {
 
 void drawFeatures(cv::Mat& img, const objectrecognition::RegionFeatures& f,
                   const std::string& text) {
+    // Silhouette's palette (D-28), BGR: lime box, blue axis. Every mark gets a dark halo drawn
+    // first, because the same overlay sits on white paper and on a dark object; lime alone
+    // nearly vanishes against the paper.
+    const cv::Scalar lime(107, 255, 124), blue(255, 141, 77), halo(12, 15, 11);
+    const auto haloLine = [&](cv::Point2d a, cv::Point2d b, const cv::Scalar& color) {
+        cv::line(img, a, b, halo, 5, cv::LINE_AA);
+        cv::line(img, a, b, color, 2, cv::LINE_AA);
+    };
+
     const auto corners = objectrecognition::orientedBox(f);
-    for (int i = 0; i < 4; ++i)
-        cv::line(img, corners[i], corners[(i + 1) % 4], {0, 255, 0}, 2, cv::LINE_AA);
+    for (int i = 0; i < 4; ++i) haloLine(corners[i], corners[(i + 1) % 4], lime);
 
     const cv::Point2d u(std::cos(f.theta), std::sin(f.theta));
-    cv::line(img, f.centroid + f.minE1 * u, f.centroid + f.maxE1 * u, {255, 0, 0}, 2, cv::LINE_AA);
-    cv::circle(img, f.centroid, 4, {0, 0, 255}, cv::FILLED);
-    cv::putText(img, text, f.centroid + cv::Point2d(10, -10), cv::FONT_HERSHEY_SIMPLEX, 0.7,
-                {0, 0, 255}, 2);
+    haloLine(f.centroid + f.minE1 * u, f.centroid + f.maxE1 * u, blue);
+    cv::circle(img, f.centroid, 6, halo, cv::FILLED, cv::LINE_AA);
+    cv::circle(img, f.centroid, 4, lime, cv::FILLED, cv::LINE_AA);
+
+    const cv::Point2d at = f.centroid + cv::Point2d(12, -12);
+    cv::putText(img, text, at, cv::FONT_HERSHEY_SIMPLEX, 0.7, halo, 5, cv::LINE_AA);
+    cv::putText(img, text, at, cv::FONT_HERSHEY_SIMPLEX, 0.7, lime, 2, cv::LINE_AA);
 }

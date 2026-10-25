@@ -370,3 +370,9 @@ Commits `f645167` (Session extracted from server.exe), `ea6729d` (C++ → WebAss
 
 A phone (not in the DB) was labelled "ball"/"cloud". Your diagnosis from the Threshold/Regions views: saturation darkening (D-22) makes the hand foreground; hand + phone form one region that touches the border, so T3 drops it (D-08); the camera module (a dark disc inside a lighter ring) becomes the primary region. Its ResNet18 distance (~0.35-0.375) straddles the cosine cutoff (0.35), so the label flickers between ball, cloud and unknown. NN is closed-set: it can only say a DB label or "unknown".
 Fixes: demo protocol (object on paper, hands out of frame: the task's assumption); auto-learn the phone (extension demo); optionally a stricter cutoff (~0.30, costs false unknowns: one-shot correct matches reach 0.36).
+
+## D-28 — GUI polish and browser storage (decided 2026-10-24, night)
+
+- **Name:** Silhouette (your pick; mentor noted it undersells the ResNet18 half). Logo: a dark blob crossed by its primary axis.
+- **Theme:** dark by default, **Lab bench**: near-black ink, lime accent (= OBB box), blue (= primary axis). The video overlay uses the same colours with a dark halo so it reads on white paper (your contrast question).
+- **Storage:** samples a visitor trains survive a refresh: IndexedDB (the browser's built-in database), on their device only. Each sample = label + 5 features + 512-d embedding + a thumbnail of the **crop it learned from** (the ROI, region of interest). **Cap 50** (one auto-learn run = 5); a gallery lists them with delete-one / delete-label / clear-all; Train refuses when full.
