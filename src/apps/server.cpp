@@ -1,7 +1,9 @@
 // HTTP backend for the web GUI (D-13). Runs the same pipeline as live, but instead of OpenCV
 // windows it serves MJPEG streams and a small JSON API on 127.0.0.1.
-// Usage: server [camera-index | video-file | stream-url | image-dir] [port]   (default: 0 8080)
+// Usage: server [--browser | camera-index | video-file | stream-url | image-dir] [port]
+//        (default: --browser 8080). --browser = frames pushed by the GUI's camera (D-24).
 //
+//   WS     /ws/frames                                  binary JPEG in, {"ok":true} ack out
 //   GET    /stream?view=annotated|threshold|regions   multipart MJPEG
 //   GET    /api/status                                 latest frame's threshold, features, match
 //   GET    /api/db                                     sample count per label
@@ -21,6 +23,9 @@
 // Threading: the pipeline, the DB, and the label are owned by the main thread. HTTP handlers
 // never touch them; they queue a command and wait for its reply, so no locks around the DB.
 
+// A 640x480 JPEG is ~50 KB; the default 16 MB cap only gives a hostile page room to make us
+// buffer. Must precede the include: httplib reads it at compile time.
+#define CPPHTTPLIB_WEBSOCKET_MAX_PAYLOAD_LENGTH (4 * 1024 * 1024)
 #include <httplib.h>
 
 #include <atomic>
@@ -34,6 +39,7 @@
 #include <iostream>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <opencv2/core/utils/logger.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
@@ -44,6 +50,7 @@
 #include "app/auto_learn.h"
 #include "app/capture.h"
 #include "app/feature_db.h"
+#include "app/frame_mailbox.h"
 #include "app/frame_source.h"
 #include "app/overlay.h"
 #include "app/pipeline.h"
@@ -58,6 +65,10 @@ namespace {
 
 const std::string kDbPath = "data/db/features.csv";
 const std::vector<std::string> kViews = {"annotated", "threshold", "regions"};
+// Morphology n and the min-area filter are in pixels, tuned on 640x480 captures (D-07, D-21),
+// so larger browser frames are scaled down to this width before the pipeline sees them.
+constexpr int kPipelineWidth = 640;
+constexpr int kMaxFrameSide = 4096;
 
 struct Reply {
     int status = 200;
@@ -137,16 +148,56 @@ void sendJson(httplib::Response& res, const Reply& reply) {
 int main(int argc, char** argv) {
     cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_WARNING);
 
-    const std::string spec = argc > 1 ? argv[1] : "0";
+    const std::string spec = argc > 1 ? argv[1] : "--browser";
     const int port = argc > 2 ? std::stoi(argv[2]) : 8080;
-    FrameSource source(spec);
-    if (!source.isOpen()) {
-        std::cerr << "cannot open input: " << spec << "\n";
-        return 1;
+    const bool browser = spec == "--browser";
+    std::optional<FrameSource> source;
+    if (!browser) {
+        source.emplace(spec);
+        if (!source->isOpen()) {
+            std::cerr << "cannot open input: " << spec << "\n";
+            return 1;
+        }
     }
+    const auto isStill = [&] { return source && source->isStill(); };
+    const auto sourceName = [&] { return source ? source->currentName() : std::string("browser"); };
 
     Shared shared;
+    FrameMailbox mailbox;
     httplib::Server http;
+
+    // One connection per camera tab. The ack is sent only after the pipeline took the frame,
+    // so a client that waits for it never has more than one frame in flight (H-50).
+    http.WebSocket("/ws/frames", [&](const httplib::Request&, httplib::ws::WebSocket& ws) {
+        ws.set_read_timeout(1s);  // wake up regularly so an idle tab can't block shutdown
+        std::string msg;
+        while (shared.running && ws.is_open()) {
+            const auto kind = ws.read(msg);
+            if (kind == httplib::ws::Timeout) continue;
+            if (kind == httplib::ws::Fail) break;
+            if (kind != httplib::ws::Binary) {
+                ws.send(jsonError("send JPEG frames as binary messages"));
+                continue;
+            }
+            if (!browser) {
+                ws.send(jsonError("server was started with a fixed source"));
+                continue;
+            }
+            const cv::Mat bytes(1, static_cast<int>(msg.size()), CV_8UC1, msg.data());
+            cv::Mat decoded = cv::imdecode(bytes, cv::IMREAD_COLOR);
+            if (decoded.empty() || decoded.cols > kMaxFrameSide || decoded.rows > kMaxFrameSide) {
+                ws.send(jsonError("not a decodable JPEG"));
+                continue;
+            }
+            if (decoded.cols > kPipelineWidth) {
+                const double scale = static_cast<double>(kPipelineWidth) / decoded.cols;
+                cv::resize(decoded, decoded, cv::Size(), scale, scale, cv::INTER_AREA);
+            }
+            const auto seq = mailbox.put(std::move(decoded));
+            if (!mailbox.waitConsumed(seq, 3s)) break;  // shutting down, or the pipeline hung
+            ws.send(R"({"ok":true})");
+        }
+    });
 
     http.Get("/stream", [&](const httplib::Request& req, httplib::Response& res) {
         const std::string view = req.has_param("view") ? req.get_param_value("view") : "annotated";
@@ -286,6 +337,7 @@ int main(int argc, char** argv) {
     http.Post("/api/capture", [&](const httplib::Request&, httplib::Response& res) {
         sendJson(res, runOnPipeline(shared, [&] {
                      if (label.empty()) return Reply{409, jsonError("set a label first")};
+                     if (frame.empty()) return Reply{409, jsonError("no camera frame yet")};
                      const std::string file = timestamp() + ".png";
                      saveImage(fs::path("data/objects") / label, file, frame);
                      saveImage(fs::path("out/stages/threshold") / label, file, result.binary);
@@ -383,54 +435,35 @@ int main(int argc, char** argv) {
     });
     std::cout << "serving on http://127.0.0.1:" << port << "  (source: " << spec
               << ", db: " << db.size() << " samples)" << std::endl;
+    if (browser)
+        std::cout << "waiting for the GUI camera on ws://127.0.0.1:" << port << "/ws/frames"
+                  << std::endl;
 
     const std::vector<int> jpegParams = {cv::IMWRITE_JPEG_QUALITY, 80};
     double fps = 0.0;
     auto lastTick = std::chrono::steady_clock::now();
 
-    while (shared.running) {
-        // Stills are re-processed each tick so settings changes show up without a new frame.
-        if (!source.isStill() || advance) {
-            cv::Mat next;
-            if (!source.next(next)) {
-                if (!source.isStill()) break;  // video ended / camera lost
-            } else {
-                frame = next;
-            }
-            advance = false;
+    const auto runCommands = [&] {
+        std::deque<std::pair<std::function<Reply()>, std::promise<Reply>>> pending;
+        {
+            std::lock_guard lock(shared.m);
+            pending.swap(shared.commands);
         }
-        if (frame.empty()) break;
+        for (auto& [fn, promise] : pending) promise.set_value(fn());
+    };
 
-        runPipeline(frame, result);
-        frame.copyTo(display);
-        colorizeRegions(result.regionMap, regionsVis);
-        const auto frameTime = AutoLearn::Clock::now();
+    // The last processed frame's classification; outlives the frame so idle ticks can still
+    // report it.
+    bool canClassify = false;
+    orec::Match match{};
+    auto frameTime = AutoLearn::Clock::now();
 
-        // Classify once per frame; status, auto-learn, and evaluation all reuse it.
-        const bool canClassify = result.hasFeatures && db.size() >= 2;
-        orec::Match match{};
-        if (canClassify)
-            match = orec::classifyNearest(db, stdevs, result.features.values, unknownThreshold);
-        // With fewer than 2 samples nothing can be recognised, so every object counts as
-        // unknown: that is what lets auto-learn bootstrap an empty DB.
-        const bool unknown = result.hasFeatures && (!canClassify || !match.known);
-        currentPrediction = !result.hasFeatures ? "" : unknown ? "unknown" : match.label;
-
-        if (mode == "detect") {
-            const double diagonal = std::hypot(frame.cols, frame.rows);
-            autoLearn.update(result.hasFeatures, unknown, result.features.centroid,
-                             result.features.theta, diagonal, frameTime);
-            if (result.hasFeatures && autoLearn.wantsSample(frameTime)) {
-                addSample(autoLearn.label());  // before sampleTaken: the last pose clears it
-                autoLearn.sampleTaken(result.features.centroid, result.features.theta);
-            }
-        }
-
+    const auto statusJson = [&] {
         std::ostringstream status;
         status << R"({"mode":")" << mode << R"(","threshold":)" << result.threshold
                << R"(,"label":")" << jsonEscape(label) << R"(","source":")"
-               << jsonEscape(source.currentName()) << R"(","still":)"
-               << (source.isStill() ? "true" : "false") << R"(,"dbSize":)" << db.size()
+               << jsonEscape(sourceName()) << R"(","still":)" << (isStill() ? "true" : "false")
+               << R"(,"browser":)" << (browser ? "true" : "false") << R"(,"dbSize":)" << db.size()
                << R"(,"unknownThreshold":)" << unknownThreshold << R"(,"fps":)"
                << cv::format("%.1f", fps) << R"(,"autoLearn":{"state":")"
                << toString(autoLearn.state()) << R"(","progress":)"
@@ -452,7 +485,64 @@ int main(int argc, char** argv) {
                 status << "null";
             }
             status << "}";
+        } else {
+            status << "null";
+        }
+        status << "}";
+        return status.str();
+    };
 
+    while (shared.running) {
+        if (browser) {
+            // No new frame = camera stopped or not started. Keep answering the API, but don't
+            // re-run the pipeline on a frozen frame: auto-learn would read it as "held still".
+            cv::Mat next;
+            if (!mailbox.take(next, 100ms)) {
+                runCommands();
+                const std::string status = statusJson();  // mode/label changes show while idle
+                std::lock_guard lock(shared.m);
+                shared.statusJson = status;
+                continue;
+            }
+            frame = next;
+        } else if (!source->isStill() || advance) {
+            // Stills are re-processed each tick so settings changes show up without a new frame.
+            cv::Mat next;
+            if (!source->next(next)) {
+                if (!source->isStill()) break;  // video ended / camera lost
+            } else {
+                frame = next;
+            }
+            advance = false;
+        }
+        if (frame.empty()) break;
+
+        runPipeline(frame, result);
+        frame.copyTo(display);
+        colorizeRegions(result.regionMap, regionsVis);
+        frameTime = AutoLearn::Clock::now();
+
+        // Classify once per frame; status, auto-learn, and evaluation all reuse it.
+        canClassify = result.hasFeatures && db.size() >= 2;
+        match = orec::Match{};
+        if (canClassify)
+            match = orec::classifyNearest(db, stdevs, result.features.values, unknownThreshold);
+        // With fewer than 2 samples nothing can be recognised, so every object counts as
+        // unknown: that is what lets auto-learn bootstrap an empty DB.
+        const bool unknown = result.hasFeatures && (!canClassify || !match.known);
+        currentPrediction = !result.hasFeatures ? "" : unknown ? "unknown" : match.label;
+
+        if (mode == "detect") {
+            const double diagonal = std::hypot(frame.cols, frame.rows);
+            autoLearn.update(result.hasFeatures, unknown, result.features.centroid,
+                             result.features.theta, diagonal, frameTime);
+            if (result.hasFeatures && autoLearn.wantsSample(frameTime)) {
+                addSample(autoLearn.label());  // before sampleTaken: the last pose clears it
+                autoLearn.sampleTaken(result.features.centroid, result.features.theta);
+            }
+        }
+
+        if (result.hasFeatures) {
             std::string text = canClassify ? currentPrediction : "object";
             if (autoLearn.state() == AutoLearn::State::Tracking)
                 text = cv::format("unknown %.1fs",
@@ -464,10 +554,7 @@ int main(int argc, char** argv) {
                                   autoLearn.targetSamples(),
                                   autoLearn.awaitingMove() ? "move or rotate" : "hold still");
             drawFeatures(display, result.features, text);
-        } else {
-            status << "null";
         }
-        status << "}";
 
         cv::Mat thresholdBgr;
         cv::cvtColor(result.binary, thresholdBgr, cv::COLOR_GRAY2BGR);
@@ -476,26 +563,25 @@ int main(int argc, char** argv) {
         cv::imencode(".jpg", thresholdBgr, encoded["threshold"], jpegParams);
         cv::imencode(".jpg", regionsVis, encoded["regions"], jpegParams);
 
-        std::deque<std::pair<std::function<Reply()>, std::promise<Reply>>> pending;
         {
             std::lock_guard lock(shared.m);
             shared.jpeg = std::move(encoded);
-            shared.statusJson = status.str();
+            shared.statusJson = statusJson();
             ++shared.frameId;
-            pending.swap(shared.commands);
         }
         shared.frameReady.notify_all();
-        for (auto& [fn, promise] : pending) promise.set_value(fn());
+        runCommands();
 
         const auto now = std::chrono::steady_clock::now();
         const double dt = std::chrono::duration<double>(now - lastTick).count();
         lastTick = now;
         if (dt > 0) fps = fps == 0.0 ? 1.0 / dt : 0.9 * fps + 0.1 / dt;
         // Cameras pace themselves; stills would otherwise spin a core re-processing one image.
-        if (source.isStill()) std::this_thread::sleep_for(100ms);
+        if (isStill()) std::this_thread::sleep_for(100ms);
     }
 
     shared.running = false;
+    mailbox.close();
     shared.frameReady.notify_all();
     http.stop();
     httpThread.join();
