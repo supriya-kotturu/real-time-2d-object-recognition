@@ -1,14 +1,34 @@
-// Where browser-camera frames go (D-24). Locally that's server.exe over a WebSocket; the
-// Netlify version (D-03) will implement the same interface with an in-browser WASM pipeline,
-// so the capture side never changes.
+// Where browser-camera frames go (D-24). Locally that's server.exe over a WebSocket; in the
+// Netlify build (D-27) it's the pipeline worker running our C++ as WebAssembly. The capture
+// side is identical for both.
+
+import { wasmBackend } from "@/lib/wasm-backend";
+
 export interface FrameSink {
-  // Resolves once the sink is ready for the next frame. Awaiting it before sending again is
-  // the flow control: never more than one frame in flight (H-50).
-  send(jpeg: Blob): Promise<void>;
+  // Takes ownership of the frame (it is closed or transferred). Resolves once the sink is ready
+  // for the next one: awaiting it before sending again is the flow control, never more than
+  // one frame in flight (H-50).
+  send(frame: ImageBitmap): Promise<void>;
   close(): void;
 }
 
 export class SinkError extends Error {}
+
+const JPEG_QUALITY = 0.8;
+
+export function connectWasmSink(): Promise<FrameSink> {
+  return Promise.resolve({
+    send: (frame) => wasmBackend.sendFrame(frame),
+    close() {},
+  });
+}
+
+async function toJpeg(frame: ImageBitmap): Promise<Blob> {
+  const canvas = new OffscreenCanvas(frame.width, frame.height);
+  canvas.getContext("2d")!.drawImage(frame, 0, 0);
+  frame.close();
+  return canvas.convertToBlob({ type: "image/jpeg", quality: JPEG_QUALITY });
+}
 
 export function connectServerSink(url: string): Promise<FrameSink> {
   return new Promise((resolve, reject) => {
@@ -41,10 +61,11 @@ export function connectServerSink(url: string): Promise<FrameSink> {
       // Opened: a later error only fails the frame in flight, not the connect promise.
       ws.onerror = null;
       resolve({
-        send(jpeg) {
-          if (pending) return Promise.reject(new SinkError("previous frame not acked yet"));
+        async send(frame) {
+          if (pending) throw new SinkError("previous frame not acked yet");
+          const jpeg = await toJpeg(frame);
           if (ws.readyState !== WebSocket.OPEN)
-            return Promise.reject(new SinkError("connection to server.exe closed"));
+            throw new SinkError("connection to server.exe closed");
           return new Promise<void>((res, rej) => {
             pending = { resolve: res, reject: rej };
             ws.send(jpeg);

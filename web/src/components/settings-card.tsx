@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
+import { useWasmModel } from "@/hooks/use-wasm-model";
 import {
   api,
   CLASSIFIERS,
@@ -14,6 +15,7 @@ import {
   type Metric,
   type Status,
 } from "@/lib/api";
+import { USE_WASM } from "@/lib/wasm-backend";
 
 const first = (v: number | readonly number[]) => (Array.isArray(v) ? v[0] : (v as number));
 
@@ -25,6 +27,7 @@ export function SettingsCard({ status }: { status: Status | null }) {
   const range = metricInfo(metric);
   const value = draft ?? status?.unknownThreshold ?? range.min;
   const metrics = CLASSIFIERS.find((c) => c.value === classifier)!.metrics;
+  const model = useWasmModel();
 
   const commit = async (next: number) => {
     try {
@@ -96,11 +99,20 @@ export function SettingsCard({ status }: { status: Status | null }) {
           onValueChange={(v) => setDraft(first(v))}
           onValueCommitted={(v) => commit(first(v))}
         />
+        {USE_WASM && model.state === "loading" && (
+          <p className="setting-note">
+            Downloading ResNet18 from the ONNX model zoo (47 MB, once; your browser caches it):{" "}
+            {Math.round(model.progress * 100)}%. Hand features work meanwhile.
+          </p>
+        )}
+        {USE_WASM && model.state === "error" && (
+          <p className="setting-note">ResNet18 unavailable: {model.message}</p>
+        )}
         {classifier === "resnet18" ? (
           <p className="setting-note">
-            ResNet18 compares whole-image embeddings: 47/47 on our test split, but slower (about
-            100 ms per frame on the hosted CPU) and sensitive to lighting changes. Switch to Hand
-            features to compare.
+            ResNet18 compares whole-image embeddings: 47/47 on our test split, but slower (
+            {USE_WASM ? "~250 ms per frame in your browser" : "~40 ms per frame on a laptop CPU"})
+            and sensitive to lighting changes. Switch to Hand features to compare.
           </p>
         ) : (
           <p className="setting-note">

@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev -H 127.0.0.1",
     "build": "next build",
+    "dev:wasm": "node scripts/wasm.mjs dev",
+    "build:wasm": "node scripts/wasm.mjs build",
     "start": "next start -H 127.0.0.1",
     "lint": "eslint"
   },
@@ -15,6 +17,7 @@
     "lucide-react": "^1.61.0",
     "next": "16.4.3",
     "next-themes": "^0.4.6",
+    "onnxruntime-web": "1.30.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "shadcn": "^4.22.1",

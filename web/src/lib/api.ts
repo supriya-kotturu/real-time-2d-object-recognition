@@ -1,5 +1,7 @@
 // Typed client for server.exe's JSON API (D-13). Shapes mirror src/apps/server.cpp.
 
+import { USE_WASM, wasmRequest } from "@/lib/wasm-backend";
+
 // Rewrite proxies may buffer multipart responses, so <img> loads the stream straight from
 // the C++ server instead of through Next.
 // The static export served by server.exe --public (D-26) builds with this set to "", making
@@ -108,12 +110,26 @@ export const LABEL_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 export class ApiError extends Error {}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // Browser build (D-27): the same routes, answered by the pipeline worker instead of HTTP.
+  if (USE_WASM) {
+    const reply = await wasmRequest(
+      path,
+      init?.method ?? "GET",
+      init?.body ? JSON.parse(String(init.body)) : undefined,
+    );
+    let body: { error?: string } | null = null;
+    try {
+      body = JSON.parse(reply.body);
+    } catch {}
+    if (reply.status >= 400 || body === null) throw new ApiError(body?.error ?? `HTTP ${reply.status}`);
+    return body as T;
+  }
   const res = await fetch(path, {
     cache: "no-store",
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
-  // A sleeping HF Space answers with an HTML "starting" page, often with 200: that is not a
+  // A proxy or sleeping host can answer with an HTML page, even with 200: that is not a
   // status, so it must count as offline rather than as an empty object.
   const body = await res.json().catch(() => null);
   if (!res.ok || body === null) throw new ApiError(body?.error ?? `HTTP ${res.status}`);

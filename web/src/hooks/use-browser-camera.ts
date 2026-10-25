@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { framesSocketUrl } from "@/lib/api";
-import { connectServerSink, type FrameSink } from "@/lib/frame-sink";
+import { connectServerSink, connectWasmSink, type FrameSink } from "@/lib/frame-sink";
+import { USE_WASM } from "@/lib/wasm-backend";
 
 export type CameraPhase = "idle" | "starting" | "live" | "error";
 export type FrameSourceKind = "camera" | "samples";
@@ -11,7 +12,6 @@ export type FrameSourceKind = "camera" | "samples";
 // The pipeline's pixel-based parameters were tuned on 640x480 (D-07, D-21). Scaling keeps the
 // camera's aspect ratio: squashing 16:9 into 4:3 would change the aspectRatio feature.
 const FRAME_WIDTH = 640;
-const JPEG_QUALITY = 0.8;
 
 // D-26: one held-out test capture per label (data/test), so visitors without the physical
 // objects can still watch recognition work. Each is shown long enough for the overlay to settle.
@@ -34,15 +34,10 @@ function describe(err: unknown): string {
   return err instanceof Error ? err.message : "Camera failed";
 }
 
-function grabJpeg(video: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<Blob> {
+function grabFrame(video: HTMLVideoElement): Promise<ImageBitmap> {
   const width = Math.min(FRAME_WIDTH, video.videoWidth);
   const height = Math.round((width * video.videoHeight) / video.videoWidth);
-  if (canvas.width !== width) canvas.width = width;
-  if (canvas.height !== height) canvas.height = height;
-  canvas.getContext("2d")!.drawImage(video, 0, 0, width, height);
-  return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("JPEG encode failed"))), "image/jpeg", JPEG_QUALITY),
-  );
+  return createImageBitmap(video, { resizeWidth: width, resizeHeight: height, resizeQuality: "high" });
 }
 
 export function useBrowserCamera() {
@@ -75,8 +70,8 @@ export function useBrowserCamera() {
 
   // Shared by both sources: connect, then send whatever `next` produces, one frame in flight.
   const pump = useCallback(
-    async (gen: number, next: () => Promise<Blob>, minIntervalMs = 0) => {
-      const sink = await connectServerSink(framesSocketUrl());
+    async (gen: number, next: () => Promise<ImageBitmap>, minIntervalMs = 0) => {
+      const sink = USE_WASM ? await connectWasmSink() : await connectServerSink(framesSocketUrl());
       if (gen !== generation.current) {
         sink.close();
         return;
@@ -155,8 +150,7 @@ export function useBrowserCamera() {
         video.srcObject = stream;
         await video.play();
 
-        const canvas = document.createElement("canvas");
-        await pump(gen, () => grabJpeg(video, canvas));
+        await pump(gen, () => grabFrame(video));
       } catch (err) {
         fail(err);
       }
@@ -167,11 +161,11 @@ export function useBrowserCamera() {
   const startSamples = useCallback(async () => {
     const { gen, fail } = begin("samples");
     try {
-      const blobs = await Promise.all(
+      const images = await Promise.all(
         SAMPLE_LABELS.map(async (label) => {
           const res = await fetch(`/samples/${label}.jpg`);
           if (!res.ok) throw new Error(`missing sample image: ${label}`);
-          return res.blob();
+          return createImageBitmap(await res.blob());
         }),
       );
       const startedAt = performance.now();
@@ -180,12 +174,12 @@ export function useBrowserCamera() {
         gen,
         async () => {
           const i =
-            Math.floor((performance.now() - startedAt) / (SAMPLE_SECONDS * 1000)) % blobs.length;
+            Math.floor((performance.now() - startedAt) / (SAMPLE_SECONDS * 1000)) % images.length;
           if (i !== shown && gen === generation.current) {
             shown = i;
             setSampleLabel(SAMPLE_LABELS[i]);
           }
-          return blobs[i];
+          return createImageBitmap(images[i]); // a copy: the sink takes ownership
         },
         1000 / SAMPLE_FPS,
       );

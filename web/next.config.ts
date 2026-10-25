@@ -8,6 +8,8 @@ const backend = process.env.OBJREC_BACKEND ?? "http://127.0.0.1:8080";
 // itself. Same origin then, so there is nothing to rewrite (and exports can't rewrite anyway),
 // and an empty stream origin makes every stream/WebSocket URL relative to the page.
 const staticExport = process.env.OBJREC_EXPORT === "1";
+// D-27: the browser build has no server at all, so nothing to rewrite to either.
+const wasmBackend = process.env.NEXT_PUBLIC_BACKEND === "wasm";
 
 const nextConfig: NextConfig = {
   // Served by server.exe itself: "" (same origin). Built on Netlify: the HF Space's URL.
@@ -26,7 +28,7 @@ const nextConfig: NextConfig = {
       },
     },
   },
-  ...(!staticExport && {
+  ...(!staticExport && !wasmBackend && {
     async rewrites() {
       return [{ source: "/api/:path*", destination: `${backend}/api/:path*` }];
     },
