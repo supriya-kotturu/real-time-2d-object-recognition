@@ -29,7 +29,7 @@ Read this first, then `decisions.md` (D-00..D-25), `hints.md` (H-01..H-49), `sco
 | exe | purpose |
 | --- | --- |
 | `live <src>` | OpenCV windows; keys: `n` type label **in the window** + Enter, `s` save raw+stages, `t` train, `q` quit |
-| `server <src> [port]` | backend for the web GUI: MJPEG `/stream?view=`, JSON `/api/*` (status, db, label, train, capture, next, settings, mode, autolearn/*, eval*), 127.0.0.1 only |
+| `server [--browser\|<src>] [port]` | backend for the web GUI. Default `--browser`: frames arrive from the GUI camera on WS `/ws/frames` (D-24); `<src>` = IP Webcam URL / index / file / dir. MJPEG `/stream?view=`, JSON `/api/*`. 127.0.0.1 only + Origin allowlist (localhost) |
 | `inspect [dir]` | headless: out/stages/{threshold,cleaned,regions,features,roi}/ + features.csv (report images T1–T4, T9 A–C) |
 | `train [objects] [db]` | rebuild data/db/features.csv from data/objects/<label>/ |
 | `eval [test] [--train dir] [--one-shot] [--db f] [--unknown x]` | confusion matrices for hand features **and** ResNet18 embeddings on the same split → out/eval/confusion_<method>_<protocol>.{md,csv} |
@@ -38,7 +38,7 @@ Read this first, then `decisions.md` (D-00..D-25), `hints.md` (H-01..H-49), `sco
 
 Pipeline (`src/app/pipeline.cpp`): saturation darkening `V·(1−S)` (D-22) → ISODATA (user's T1) → closing n=2 then opening n=1, 8-conn (D-21, proposed values) → OpenCV connected components, central off-border region (T3, D-09) → moments/axis/OBB + 5 features `percentFilled, aspectRatio, hu1, hu2, hu3` (T4) → scaled-Euclidean NN with stdev floor (T6) / cosine NN on ResNet18 embeddings (T9, `app/embedding.cpp`, ROI aligned by +θ with third-moment 180° disambiguation).
 
-Web GUI: `web/` = Next.js 16.4.3 + TS + Tailwind v4 + shadcn/ui (Base UI). Long class lists are named classes in `globals.css`; generated `components/ui/*` untouched. Modes Detect (auto-learn, D-15/D-17) / Collect / Evaluate. Run: `./out/server.exe "<src>"` then `cd web && npm run dev` → http://localhost:3000. npm audit: 0 vulns.
+Web GUI: `web/` = Next.js 16.4.3 + TS + Tailwind v4 + shadcn/ui (Base UI). Long class lists are named classes in `globals.css`; generated `components/ui/*` untouched. Modes Detect (auto-learn, D-15/D-17) / Collect / Evaluate. Run: `./out/server.exe` (browser camera) or `./out/server.exe "<src>"`, then `cd web && npm run dev` (binds 127.0.0.1) → http://localhost:3000 → Start camera. npm audit: 0 vulns.
 
 ## Data
 

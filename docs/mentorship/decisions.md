@@ -314,3 +314,17 @@ Data: 58 training images (10 labels) in `data/objects/`; 37 usable test images (
 ## D-25 — Classifier toggle in the GUI (proposed)
 
 Toggle features | embedding (ResNet18) in the GUI. Embedding DB per model (H-01): `data/db/embeddings_resnet18.csv` built by `train --embed`. Separate unknown cutoff per method (cosine 0–2 vs scaled Euclidean). Train/Collect/auto-learn append to both DBs. Compute embeddings only when needed (or every frame for instant switching, at an fps cost). Suits T8 ("classical, embedding, or both"). You asked about it; not confirmed yet.
+
+### D-24 answers (session 2, 2026-10-24)
+
+- **Camera:** the browser asks for camera permission (getUserMedia) and the user picks the device; not tied to one camera.
+- **Transport:** WebSocket. (Correction: vendored cpp-httplib v0.60.1 has `Server::WebSocket`, so no extra library. Next rewrites don't proxy WS upgrades, so the client connects to ws://127.0.0.1:8080 directly, like the MJPEG stream.)
+- **Sources:** browser camera becomes the default; IP Webcam moves to a separate branch "eventually".
+- **Your question:** "since we're deploying on Netlify, where will the camera server be?" Open, see the session.
+
+### D-24 decided (session 2, 2026-10-24)
+
+- **World:** option A. Local now: browser camera → WebSocket `/ws/frames` → server.exe on 127.0.0.1 → same pipeline → MJPEG/status. Netlify (post-deadline, D-03) reuses the capture UI and swaps the sink for in-browser WASM. Rejected: B (WASM now: 1–2 days, puts T8/report at risk), C (hosted server.exe: frames leave the browser, costs money, public API needs auth).
+- **Sources:** browser camera is the default (`server` with no args); IP Webcam/camera index/video/dir stay as options (`server <src>`). Your trade-off: "okay to give different options". Bookmark branch `archive/ipwebcam` (at `db84296`) is kept and never deleted.
+- **Flow control (H-50):** one frame in flight. The server acks a frame only once the pipeline has consumed it; the browser sends the next frame on the ack. A single-slot mailbox (latest wins) covers several tabs.
+- **Open:** hosting server.exe "for a limited time" (your follow-up); options in the session.
