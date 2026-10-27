@@ -387,3 +387,8 @@ Phone layout fine; back camera; trained "phone" with 3 samples in the browser; l
 **Chosen: A + B.** (A) show the camera directly and draw only the box/axis/label on top from the latest result: smooth video, overlay trails a moving object briefly. (B) run ResNet18 on WebGPU with a WebAssembly fallback. Rejected: embedding every Nth frame (stale labels; auto-learn could store stale embeddings).
 
 **D-29 on your phone (2026-10-25):** classifier card reports "Running on your GPU via WebGPU" on the deployed draft.
+
+### Report finding: auto-learn rarely fires on look-alikes (2026-10-27, demo recordings)
+
+New objects whose silhouette resembles a trained one (round tin vs batteries, snack bag vs notebook at distance 0.301 / cutoff 0.350) flicker between a known label and unknown. Cause: one "known" frame resets the 3 s hold ([auto_learn.cpp](../../src/app/auto_learn.cpp) `update`), so a borderline object never stays unknown for 3 s straight. Workaround used in the demo: cutoff lowered to 0.200 (costs false unknowns on trained objects under lighting changes).
+**Further improvement (yours, not built):** decide on the fraction of frames in the hold window that read unknown (e.g. ≥ 80%) instead of requiring every frame; one noisy frame then no longer erases the hold. Related: hysteresis (separate enter/leave cutoffs) or smoothing the distance over frames.

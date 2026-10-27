@@ -26,7 +26,30 @@ Silent looping preview; click it for the full video ([samples.mp4](public/demo/s
 
 ### Live camera and unknown objects
 
-Coming soon.
+Phone camera on the deployed site, ResNet18 cosine classifier. Silent, sped-up previews; click one for the full video.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="public/demo/detect-trained-objects.mp4"><img src="public/demo/detect-trained-objects.gif" alt="Trained objects recognised as known" width="100%"></a>
+      <br><b>Trained objects</b> (66 s): every trained object recognised as known.
+    </td>
+    <td width="50%" valign="top">
+      <a href="public/demo/misclassified-similar-shapes.mp4"><img src="public/demo/misclassified-similar-shapes.gif" alt="New objects misclassified as trained look-alikes" width="100%"></a>
+      <br><b>Look-alikes</b> (30 s): new objects whose silhouettes match trained ones are named as those (a round tin as batteries, a snack bag as notebook) at the default cutoff of 0.350.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="public/demo/autolearn-unknown-low-cutoff.mp4"><img src="public/demo/autolearn-unknown-low-cutoff.gif" alt="Auto-learn of an unknown spoon" width="100%"></a>
+      <br><b>Auto-learn</b> (103 s): with the unknown cutoff lowered to 0.200, a spoon is flagged unknown, named, learned and then recognised.
+    </td>
+    <td width="50%" valign="top">
+      <a href="public/demo/dataset-after-autolearn.mp4"><img src="public/demo/dataset-after-autolearn.gif" alt="Database after auto-learn" width="100%"></a>
+      <br><b>Database</b> (49 s): Collect mode listing the samples, with the auto-learned object added.
+    </td>
+  </tr>
+</table>
 
 ## What it does
 
