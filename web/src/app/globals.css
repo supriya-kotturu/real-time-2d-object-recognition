@@ -168,6 +168,13 @@
   .dashboard-column {
     @apply flex min-w-0 flex-col gap-6;
   }
+  /* Left-aligned: Netlify's "Powered by" badge is pinned bottom-right. */
+  .dashboard-footer {
+    @apply flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-4 text-xs text-muted-foreground;
+  }
+  .dashboard-footer a {
+    @apply underline-offset-4 hover:text-foreground hover:underline;
+  }
   .dashboard-main {
     @apply lg:col-start-1 lg:row-start-1;
   }
