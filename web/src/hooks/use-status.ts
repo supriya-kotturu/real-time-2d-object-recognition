@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { api, type Status } from "@/lib/api";
+import { USE_WASM, wasmBackend } from "@/lib/wasm-backend";
 
-export function useStatus(intervalMs = 250) {
+function usePolledStatus(intervalMs = 250) {
   const [status, setStatus] = useState<Status | null>(null);
   const [connected, setConnected] = useState(false);
 
@@ -37,3 +38,26 @@ export function useStatus(intervalMs = 250) {
 
   return { status, connected };
 }
+
+// The browser build pushes a status with every processed frame. Polling it lagged the cards
+// behind the live overlay (which subscribes) by up to one interval, so on a sample switch the
+// prediction card still named the previous object while the box already showed the new one.
+const subscribe = (onChange: () => void) => wasmBackend.subscribe(onChange);
+
+function useWasmStatus() {
+  useEffect(() => wasmBackend.start(), []);
+  const raw = useSyncExternalStore(
+    subscribe,
+    () => wasmBackend.status,
+    () => null,
+  );
+  const fatal = useSyncExternalStore(
+    subscribe,
+    () => wasmBackend.fatal,
+    () => null,
+  );
+  const status = useMemo(() => (raw ? (JSON.parse(raw) as Status) : null), [raw]);
+  return { status, connected: status !== null && fatal === null };
+}
+
+export const useStatus = USE_WASM ? useWasmStatus : usePolledStatus;
