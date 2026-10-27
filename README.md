@@ -12,7 +12,7 @@ can be compared on the same frames.
 | | |
 |---|---|
 | Demo videos | [below](#demo) |
-| Live demo | https://real-time-object-recognition.netlify.app (runs entirely in your browser; deployed from `main`) |
+| Live demo | https://real-time-2d-object-recognition.netlify.app (runs entirely in your browser; deployed from `main`) |
 | Report | [YOU: link or "submitted on Gradescope"] |
 | Time travel days used | 0 |
 
