@@ -1258,4 +1258,76 @@ can you check the edits and polish it, in the AI usage, give detailed descriptio
 
 ## Claude
 
-Done. Now the transcripts. Re-exporting so session 2 includes today's exchanges, and adding a short README to the folder:
+All three parts are done. The [report](https://docs.google.com/document/d/1Ap7x31mR-uxnqZzGC3BI2ZXjesSBbogVaiN1n2Gz2GM/edit?tab=t.0) is at the same link.
+
+**1. Your edits, checked and polished** (all as **tracked suggestions**: open the doc, review each, accept or reject):
+- **Project description:** your sentences kept. I suggested text at your two `[AI: …]` markers (closing then opening; how the label is decided, including the ResNet18 path), "detect" → "recognise", the saturation step, and deleting the facts block underneath. Total: **172 words**, under the 200 limit.
+- **T1:** a colon fix and a missing full stop.
+- **T8:** the **video link slot is back**. Task 8 requires it, and your edit had dropped it.
+- **Extensions:** finished your opening sentence; fixed the heading spelling ("Extentions" → "Extensions").
+- **Reflection:**
+  - "hoops to *jump through*", "*an* 'I knew it'", "*and couldn't* afford";
+  - the run-on sentence closed with "all without a server.";
+  - the unfinished last sentence completed;
+  - a YOLO nuance added (its backbone *can* give embeddings; the real cost is retraining with hand-drawn boxes).
+- **T2:** cleared the leftover bold and yellow highlight on your sentence (formatting only, applied directly).
+
+**2. AI-usage statement** (a suggestion in Acknowledgements, first person since it's yours): it describes the mentoring setup and scoring (+13), then what you did vs what Claude did for each of:
+- Task 1,
+- Task 2,
+- Tasks 3–9 and the tools,
+- the GUI and deployment (including that you proposed the serverless worker),
+- the phone debugging,
+- this report.
+
+It points to the transcripts. **Read it carefully:** it's your declaration, so change anything that doesn't match how you see it.
+
+**3. Transcripts:** `transcripts/` in the repo, with a README and three files:
+- Session 0: reading the assignment, 2 entries
+- Session 1: Oct 23–24, 144 entries
+- Session 2: Oct 24–26, 92 entries
+
+Each contains your messages, your answers to my multiple-choice questions, my questions, and my final reply per turn. No tool calls, builds or system text. I scanned them for credentials, emails and tokens and found only the `USERNAME:PASSWORD` placeholders. This turn's reply isn't in them yet; I can re-export at the very end.
+
+**One mistake to own:** my earlier list repair had switched all your **section headings from numbers to bullets**. I restored the numbering (1–13, verified), and it's back to how you set it up.
+
+**Q1:** The repo is **public**. Pushing `transcripts/` publishes our entire mentoring conversation, including the scoring and your comments (e.g. about money). Do you want it pushed, or only included in the Gradescope upload? It's committed locally either way.
+
+## Supriya
+
+should we also add YOLO to see how it does compared to ResNet's embeddings?
+
+## Claude
+
+It's doable, but think about the timing first. It's Monday evening and the deadline is tomorrow 23:59. Still open:
+- the **T8 video** (not recorded yet, and it's required),
+- your review → merge → production URL,
+- the readme,
+- the explain-it-back prep for the Q&A.
+
+None of the 30 points depends on YOLO: you already have more than enough extensions, and they're capped at 4.
+
+**If you want it anyway, the cheapest version that still answers the question:**
+
+| | |
+|---|---|
+| **Model** | YOLOX-nano (Apache licence, ~4 MB ONNX published on its GitHub release). Avoids Ultralytics' AGPL licence and a multi-GB PyTorch install just to export. |
+| **Embedding** | Same aligned crop as ResNet18 → YOLOX backbone → global-average-pool its last feature map → cosine nearest neighbour. Same recipe, only the embedder swapped. |
+| **Scope** | **`eval` only**: one more row in Table 2 (split, one-shot, leave-one-out). No GUI, no browser build. |
+| **Cost** | ~1.5–2 h. Mostly finding the right internal layer and YOLOX's input format (no ImageNet normalisation, 416×416). |
+| **Expected result** | Probably *below* ResNet18. Its features are trained to locate boxes, not to summarise "what is this". Either way it's a real measured comparison, which makes a good Table 2 row and a sentence in your reflection. |
+
+**My recommendation:** record the T8 video first, since that's base points. Then, if you still want it, YOLOX as an eval-only experiment, with a 2-hour cap so it can't eat into Tuesday's report window. If it runs over, I stop and we report it as future work.
+
+Q1: Have you recorded the T8 video, or is that still ahead?
+Q2: YOLOX eval-only after the video, with the 2-hour cap?
+Q3 (still open): should `transcripts/` go to the public GitHub repo, or only into the Gradescope upload?
+
+## Supriya
+
+A1. I should record it. 
+A3. it should go in git upload, so anyone can refer it
+
+## Claude
+
+Pushing the transcripts as you asked. First re-exporting, so they include the conversation up to now:
