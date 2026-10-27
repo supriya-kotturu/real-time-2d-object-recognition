@@ -39,10 +39,10 @@ Classification: cosine distance (1 − cos) by default, SSD as an alternative.
 
 **YOLO instead?** YOLO is a **detector** trained on 80 fixed COCO classes. Its backbone *can*
 give an embedding too, but it's trained to locate and box objects, not to summarise them.
-Teaching it *your* objects means retraining with hand-drawn boxes, which is the opposite of
+Teaching it *new* objects means retraining with hand-drawn boxes, which is the opposite of
 one-shot. (Lighter than ResNet18, not heavier: YOLOv8n is ~3 M parameters vs 11.7 M.)
 
-## Check yourself
+## Test your understanding
 
 <details><summary>What has to happen to a frame before ResNet18 can embed it?</summary>
 

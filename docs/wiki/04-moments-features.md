@@ -35,7 +35,7 @@ A feature is useful for recognition when it's **invariant** to translation, scal
   aspect and hu1 under 1%; hu2 2–3%; hu3 3.5–5% (higher-order moments are more sensitive to
   pixel-level noise at the outline).
 
-## Check yourself (explain-it-back checks)
+## Test your understanding
 
 <details><summary>What does μ11 measure, and what is it for a shape aligned with the axes?</summary>
 

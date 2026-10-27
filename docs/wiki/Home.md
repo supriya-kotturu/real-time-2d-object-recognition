@@ -1,30 +1,32 @@
-# Silhouette wiki: revision notes for the Q&A
+# Silhouette wiki: the ideas behind the website
 
-The 2-point Q&A asks you to explain your implementation and extensions. Each page below covers
-one topic in three parts:
+[Silhouette](https://real-time-object-recognition.netlify.app) recognises objects lying on a
+plain background from a camera, entirely in your browser. These pages explain the computer
+vision and engineering that make it work, from turning a camera frame into a black-and-white
+silhouette to running a C++ pipeline and a neural network inside a web page.
 
-1. **The idea**, in plain terms.
-2. **In this project**: the actual numbers, files and decisions you can quote.
-3. **Check yourself**: questions to answer out loud before opening the hidden answer. If you
-   can't answer one, reread the page; that's the point of it.
+Each page has three parts:
 
-| # | Page | Revise if you can't explain… |
+1. **The idea**: the concept in plain terms.
+2. **In this project**: how Silhouette applies it, with the real parameters, results and source files.
+3. **Test your understanding**: a few questions, with answers you can expand.
+
+| # | Topic | What you'll learn |
 |---|---|---|
-| 1 | [Thresholding (ISODATA)](01-thresholding.md) | why k-means with K = 2, why sample 1/16 of the pixels |
-| 2 | [Morphology and grassfire](02-morphology-grassfire.md) | the two passes, closing vs opening, the border rule |
-| 3 | [Regions](03-regions.md) | why "central and off-border" rather than "largest" |
-| 4 | [Moments and features](04-moments-features.md) | μ11, the primary axis, the oriented box, Hu invariants |
-| 5 | [Classification](05-classification.md) | scaled Euclidean, the stdev floor, unknown objects |
-| 6 | [Evaluation](06-evaluation.md) | the three protocols and how to read the confusion matrix |
-| 7 | [Embeddings (ResNet18)](07-embeddings.md) | alignment steps A–E, cosine vs SSD, YOLO vs ResNet18 |
-| 8 | [C++ concepts](08-cpp-concepts.md) | cv::Mat sharing, out-parameters, const references, CV_32S |
-| 9 | [System and web](09-system-web.md) | Session, flow control, WebAssembly, the worker, WebGPU |
-| 10 | [Failure analysis](10-failure-analysis.md) | why the phone was "ball", why blobs get confused |
-| 11 | [Likely questions](11-likely-questions.md) | a 20-question drill, mixed topics |
+| 1 | [Thresholding (ISODATA)](01-thresholding.md) | separating an object from the background with k-means on brightness |
+| 2 | [Morphology and grassfire](02-morphology-grassfire.md) | cleaning a binary image; distance transforms in two passes |
+| 3 | [Regions](03-regions.md) | labelling connected blobs and choosing which one is the object |
+| 4 | [Moments and features](04-moments-features.md) | describing a shape so it doesn't change with position, size or rotation |
+| 5 | [Classification](05-classification.md) | nearest neighbour, scaled distances, recognising "unknown" |
+| 6 | [Evaluation](06-evaluation.md) | honest test sets and reading a confusion matrix |
+| 7 | [Embeddings (ResNet18)](07-embeddings.md) | one-shot recognition with a pretrained network; why not YOLO |
+| 8 | [C++ notes](08-cpp-concepts.md) | the C++ and OpenCV details that matter in image code |
+| 9 | [System and web](09-system-web.md) | one pipeline in three runtimes, WebAssembly, WebGPU, flow control |
+| 10 | [Failure analysis](10-failure-analysis.md) | where it breaks, and why |
 
-**Suggested order with little time:** 11 first (drill), then whatever you missed.
+For the overall design with diagrams, see [ARCHITECTURE.md](../../ARCHITECTURE.md). Every
+design choice is recorded with its alternatives in the
+[decision log](../mentorship/decisions.md) (referenced below as D-xx).
 
-**Be ready to say who wrote what.** Task 1 you wrote by hand. Task 2's grassfire was written by
-the AI from your pseudocode, and you hand-checked small grids. The rest was written by the AI
-from your design decisions (see [decisions.md](../mentorship/decisions.md)). Graders accept AI
-help that's declared; what they test is whether you understand it.
+Silhouette was built for CS5330 (Pattern Recognition and Computer Vision) at Northeastern
+University.

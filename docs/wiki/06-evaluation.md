@@ -29,7 +29,7 @@ Reading the hand-feature matrix: distinct silhouettes are fine (sticky-notes 5/5
 keychain/notebook/spects 4/5, mouse 3/4); blob-like objects fail (ball 0/6 → mostly
 sticky-notes, batteries 0/4, cloud 1/5 → mostly mouse, kitchen-towel 1/4).
 
-## Check yourself
+## Test your understanding
 
 <details><summary>Why is leave-one-out not enough on its own?</summary>
 

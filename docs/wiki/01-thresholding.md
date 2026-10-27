@@ -20,7 +20,7 @@ threshold per image, so a *local* shadow can still break it.
 histogram peaks. Real histograms are noisy and have many small dips, so the "valley" jumps
 around. k-means averages over all pixels, so it's stable.
 
-## In this project ([src/core/threshold.cpp](../../src/core/threshold.cpp), hand-written by you)
+## In this project ([src/core/threshold.cpp](../../src/core/threshold.cpp))
 
 - **Pre-processing (D-22): saturation darkening**, value × (1 − saturation). White paper and
   grey shadows have saturation ≈ 0 and keep their brightness; coloured objects (orange ball, pink
@@ -36,7 +36,7 @@ around. k-means averages over all pixels, so it's stable.
 - **Apply:** pixel > t → 0 (paper), else 255 (object). The object is dark, so "≤ t" is foreground.
 - Thresholds on the report images: toy-car 113, spects 101, ball 120.
 
-## Check yourself
+## Test your understanding
 
 <details><summary>Why is ISODATA "k-means with K = 2"?</summary>
 

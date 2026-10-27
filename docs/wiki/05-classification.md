@@ -25,9 +25,9 @@ need a **cutoff**: if even the nearest sample is too far, answer "unknown".
 - Fewer than 2 samples → nothing can be classified; every object counts as unknown, which is
   what lets auto-learn start from an empty database.
 - Database: CSV, one row per sample, `label,f1..f5`. A separate CSV holds ResNet18 embeddings,
-  because embeddings from different models live in different spaces (H-01).
+  because embeddings from different models live in different spaces.
 
-## Check yourself (explain-it-back check)
+## Test your understanding
 
 <details><summary>Why floor σ instead of skipping a feature whose σ is 0?</summary>
 

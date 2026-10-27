@@ -1,9 +1,8 @@
 # 9. System design and the web app
 
-See [ARCHITECTURE.md](../../ARCHITECTURE.md) for the diagrams. The points worth being able to
-explain:
+See [ARCHITECTURE.md](../../ARCHITECTURE.md) for the diagrams. The main design ideas:
 
-## Pure stages (D-04, H-10)
+## Pure stages (D-04)
 
 Every stage is `cv::Mat` in → `cv::Mat` out, with no windows, cameras or files. That let the
 same code serve the live window, the batch tools, the server and, later, WebAssembly in the
@@ -15,7 +14,7 @@ One class owns all state between "a frame arrived" and "here is the status": bot
 label, the mode, the classifier choice, auto-learn and live evaluation. `server.exe` and the
 browser build drive the same Session, so there's one implementation of the rules.
 
-## Flow control (H-50)
+## Flow control
 
 *Which pipe* (MJPEG, WebSocket, WebRTC) is a different question from *how fast to push*. If the
 camera produces frames faster than recognition runs, a queue grows: you see older and older
@@ -26,10 +25,10 @@ frame (a single-slot "mailbox").
 ## Browser build, no server (D-27)
 
 - Hosting the C++ server needed money (Hugging Face Docker Spaces: paid PRO plan; free hosts:
-  0.1 CPU). **You proposed** running it all in a web worker.
+  0.1 CPU). The answer was to run everything in the browser instead.
 - The C++ (OpenCV 5 core/imgproc/geometry + the project's code) is compiled to **WebAssembly**
   with Emscripten. Same source, same results: identical thresholds, features and predictions.
-- It runs in a **Web Worker** so the page never freezes (H-03).
+- It runs in a **Web Worker** so the page never freezes.
 - ResNet18 runs in **onnxruntime-web**, on the GPU via **WebGPU** when available (~15 fps), else
   WebAssembly (~3.6 fps).
 - **CORS lesson:** the model's github.com URL redirects without a CORS header, and browsers check
@@ -52,7 +51,7 @@ The server binds 127.0.0.1, but any website you visit could still call it (simpl
 WebSockets aren't covered by CORS). So it checks `Origin`, and the Next dev server binds to
 loopback too.
 
-## Check yourself
+## Test your understanding
 
 <details><summary>Why did the first GUI feel laggy, and what fixed it?</summary>
 

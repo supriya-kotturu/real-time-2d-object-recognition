@@ -12,7 +12,7 @@ The hard part isn't labelling; it's **choosing which region is the object** when
 ## In this project ([src/core/regions.cpp](../../src/core/regions.cpp))
 
 - OpenCV `connectedComponentsWithStats` on the cleaned image (not from scratch, D-09: the time
-  went to extensions instead; base marks were capped anyway).
+  went into other parts of the project instead).
 - Regions smaller than **0.2% of the frame** are dropped (scales with resolution).
 - The **5 largest** are kept.
 - **Primary region = the one whose centroid is closest to the image centre, among regions that
@@ -20,11 +20,11 @@ The hard part isn't labelling; it's **choosing which region is the object** when
 - In the report's toy-car image a second region (a dark strip along the top edge) touches the
   border and is excluded.
 
-## Check yourself (explain-it-back check)
+## Test your understanding
 
 <details><summary>Why "most central and not touching the border" instead of "the largest region"?</summary>
 
-The largest region is often wrong: a shadow, a dark table edge or your arm can be bigger than the
+The largest region is often wrong: a shadow, a dark table edge or an arm can be bigger than the
 object. A region touching the border is probably cut off, so its area, moments and box would be
 wrong and give a confident wrong answer. The user naturally puts the object in the middle, so
 "most central, fully visible" matches intent.
@@ -32,7 +32,7 @@ wrong and give a confident wrong answer. The user naturally puts the object in t
 
 <details><summary>What did the border rule do in the phone test?</summary>
 
-Your hand merged with the phone into one region that touched the border, so the whole hand+phone
+A hand holding the phone merged with it into one region that touched the border, so the whole hand+phone
 region was rejected. The camera module, a dark disc inside a lighter ring and fully inside the
 frame, became the primary region, so the classifier saw a disc and said "ball".
 </details>

@@ -25,7 +25,7 @@ distance (squares).
 
 ## In this project ([src/core/morphology.cpp](../../src/core/morphology.cpp))
 
-- Written by the AI from **your** pseudocode (D-20); you hand-checked small grids.
+- Grow and shrink are implemented from scratch, with tests on small hand-computed grids.
 - Order: **closing (grow 2, shrink 2), then opening (shrink 1, grow 1)**, 8-connected (D-21).
   Closing first, so no shrink widens a gap before it's filled.
 - Distance image is **CV_32S** (int), not CV_8U: distances can exceed 255 and "infinity + 1"
@@ -39,7 +39,7 @@ distance (squares).
 - Limit: a 6–8 px glare gap on a metal blade needs n ≥ 4, which also merges nearby parts and
   rounds corners, so n = 2 was kept.
 
-## Check yourself (explain-it-back checks)
+## Test your understanding
 
 <details><summary>Why does grow treat outside the image as "far", not as foreground?</summary>
 
