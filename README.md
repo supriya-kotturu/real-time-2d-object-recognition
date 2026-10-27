@@ -23,9 +23,9 @@ can be compared on the same frames.
 The deployed site classifying the bundled sample images (Collect → samples source), with the
 true label shown next to the prediction.
 
-<video src="public/demo/samples.mp4" controls muted playsinline width="100%"></video>
+[![Silhouette classifying the sample images](public/demo/samples.gif)](public/demo/samples.mp4)
 
-[Download / open the video](public/demo/samples.mp4)
+Silent looping preview; click it for the full video ([samples.mp4](public/demo/samples.mp4), 28 s).
 
 ### Live camera and unknown objects
 
