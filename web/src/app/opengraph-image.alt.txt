@@ -1,0 +1,1 @@
+Silhouette recognising an orange ball: oriented bounding box and primary axis drawn on the live camera, prediction "Ball, known" from ResNet18 embeddings.
