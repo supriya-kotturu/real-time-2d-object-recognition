@@ -64,4 +64,4 @@ COPY data/db data/db
 USER 1000
 EXPOSE 7860
 # The Netlify-hosted GUI (D-26) talks to this server cross-origin.
-CMD ["out/server", "--public", "--allow-origin", "real-time-object-recognition.netlify.app", "--browser", "7860"]
+CMD ["out/server", "--public", "--allow-origin", "real-time-2d-object-recognition.netlify.app", "--browser", "7860"]
