@@ -11,10 +11,25 @@ can be compared on the same frames.
 
 | | |
 |---|---|
-| Demo video | [YOU: video link] |
+| Demo videos | [below](#demo) |
 | Live demo | https://real-time-object-recognition.netlify.app (runs entirely in your browser; deployed from `main`) |
 | Report | [YOU: link or "submitted on Gradescope"] |
 | Time travel days used | 0 |
+
+## Demo
+
+### Sample images
+
+The deployed site classifying the bundled sample images (Collect → samples source), with the
+true label shown next to the prediction.
+
+<video src="public/demo/samples.mp4" controls muted playsinline width="100%"></video>
+
+[Download / open the video](public/demo/samples.mp4)
+
+### Live camera and unknown objects
+
+Coming soon.
 
 ## What it does
 

@@ -84,3 +84,6 @@ out/
 
 # Model weights: download per data/models/README.md (D-18)
 data/models/*.onnx
+
+# Raw screen recordings; the README uses the compressed copies
+public/demo/sample-examples.mp4
