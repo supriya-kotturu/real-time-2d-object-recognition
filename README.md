@@ -14,7 +14,7 @@ can be compared on the same frames.
 | Demo video | [YOU: video link] |
 | Live demo | https://real-time-object-recognition.netlify.app (runs entirely in your browser; deployed from `main`) |
 | Report | [YOU: link or "submitted on Gradescope"] |
-| Time travel days used | [YOU: 0] |
+| Time travel days used | 0 |
 
 ## What it does
 
