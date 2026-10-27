@@ -1,6 +1,6 @@
 # Silhouette wiki: the ideas behind the website
 
-[Silhouette](https://real-time-object-recognition.netlify.app) recognises objects lying on a
+[Silhouette](https://real-time-2d-object-recognition.netlify.app) recognises objects lying on a
 plain background from a camera, entirely in your browser. These pages explain the computer
 vision and engineering that make it work, from turning a camera frame into a black-and-white
 silhouette to running a C++ pipeline and a neural network inside a web page.
