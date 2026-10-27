@@ -15,10 +15,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const title = "Silhouette · real-time 2-D object recognition";
+const description =
+  "Teach your camera a new object with one click. Classical shape features vs ResNet18 embeddings, running entirely in your browser: C++/OpenCV compiled to WebAssembly, ResNet18 on WebGPU.";
+
+// The image comes from opengraph-image.png next to this file; these fields shape the
+// link preview when the URL is shared (LinkedIn, Slack, X).
 export const metadata: Metadata = {
-  title: "Silhouette · real-time 2-D object recognition",
-  description:
-    "See the shape, name the thing: classical shape features vs ResNet18 embeddings, running entirely in your browser (CS5330 Project 3).",
+  metadataBase: new URL("https://real-time-2d-object-recognition.netlify.app"),
+  title,
+  description,
+  authors: [{ name: "Supriya Kotturu", url: "https://www.linkedin.com/in/supriya-kotturu" }],
+  alternates: { canonical: "/" },
+  openGraph: { type: "website", url: "/", siteName: "Silhouette", title, description },
+  twitter: { card: "summary_large_image", title, description },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
