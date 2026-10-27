@@ -60,6 +60,12 @@ Phone camera on the deployed site, ResNet18 cosine classifier. Silent, sped-up p
 
 Results on 47 held-out test images: hand features 26/47 (55%), ResNet18 cosine 47/47 (100%), ResNet18 SSD 45/47 (96%). Details in the report (figures in [docs/report/figures](docs/report/figures/)) and [ARCHITECTURE.md](ARCHITECTURE.md).
 
+## Architecture
+
+![Silhouette architecture: static hosting, GUI on the main thread, C++ pipeline and ResNet18 in a Web Worker](docs/report/figures/architecture.png)
+
+The public demo has no backend server. The same C++ pipeline that builds natively is compiled to WebAssembly and runs in a Web Worker; ResNet18 runs on the GPU through WebGPU, and trained samples stay on the device. More diagrams, including the native and local-server modes, are in [ARCHITECTURE.md](ARCHITECTURE.md); the source of this one is [architecture.mmd](docs/report/figures/architecture.mmd).
+
 ## Repository layout
 
 ```text

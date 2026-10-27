@@ -1,0 +1,58 @@
+flowchart TB
+    user["User<br/>phone or laptop camera"]:::client
+
+    subgraph host["Static hosting: no backend server"]
+        netlify["Netlify<br/>Next.js static export<br/>objrec.wasm · trained DB CSVs"]:::hosting
+        zoo["ONNX model zoo<br/>resnet18-v2-7.onnx<br/>SHA-256 checked"]:::hosting
+    end
+
+    subgraph browser["Browser tab"]
+        subgraph mainthread["Main thread: Next.js GUI"]
+            gui["Detect · Collect · Evaluate<br/>live video + SVG overlay"]:::gui
+        end
+        subgraph worker["Web Worker"]
+            subgraph wasm["C++ pipeline compiled to WebAssembly (same source as native)"]
+                t1["T1 · Threshold<br/>saturation darkening + ISODATA"]:::stage
+                t2["T2 · Clean-up<br/>grassfire closing → opening"]:::stage
+                t3["T3 · Segmentation<br/>most central region off the border"]:::stage
+                t4["T4 · Features<br/>moments → axis, OBB, 5 invariants"]:::stage
+                roi["T9 · Align by axis angle<br/>crop → 224×224 tensor"]:::stage
+                nn["T6 · Nearest neighbour<br/>scaled Euclidean, cutoff 3.0<br/>or cosine / SSD, cutoff 0.35"]:::classify
+                ses["Session<br/>routes by GUI mode"]:::classify
+                t5["T5 · Training<br/>Train button or auto-learn<br/>→ add sample to DB"]:::classify
+                t7["T7 · Evaluation<br/>true label vs prediction<br/>→ live confusion matrix"]:::classify
+            end
+            ort["ResNet18<br/>onnxruntime-web<br/>WebGPU, else WASM"]:::ml
+            idb[("IndexedDB<br/>trained samples, on device")]:::store
+        end
+    end
+
+    user -->|camera frames| gui
+    netlify -->|GUI page| gui
+    netlify -->|objrec.wasm, DB CSVs| wasm
+    zoo -->|model, downloaded once| ort
+    gui -->|frame, transferred| t1
+    t1 --> t2 --> t3 --> t4
+    t4 -->|ResNet18 selected| roi
+    t4 -->|hand features| nn
+    roi -->|tensor| ort
+    ort -->|512-d embedding| nn
+    nn -->|label or unknown| ses
+    ses -->|status JSON: label, box, axis| gui
+    ses -->|Collect mode| t5
+    ses -->|Evaluate mode| t7
+    t5 -.->|new sample| nn
+    t5 <-->|save / restore samples| idb
+
+    classDef client fill:#FFDFA8,stroke:#E8A93C,color:#333
+    classDef hosting fill:#A8DCF8,stroke:#4BA3D9,color:#333
+    classDef gui fill:#D7C4F7,stroke:#9B7BDB,color:#333
+    classDef stage fill:#FFF3B8,stroke:#E0C34A,color:#333
+    classDef classify fill:#FFC9C9,stroke:#E07A7A,color:#333
+    classDef ml fill:#B8F0C0,stroke:#5CBF6B,color:#333
+    classDef store fill:#A8EEF2,stroke:#3FB8C2,color:#333
+    style host fill:#F6F7FC,stroke:#C9CCE0
+    style browser fill:#F6F7FC,stroke:#C9CCE0
+    style mainthread fill:#FFFFFF,stroke:#C9CCE0
+    style worker fill:#FFFFFF,stroke:#C9CCE0
+    style wasm fill:#FBFBF4,stroke:#D8D3A8
