@@ -1,0 +1,33 @@
+# D-27: Netlify serves a static site and nothing else. The recognition pipeline (our C++ as
+# WebAssembly) and ResNet18 (onnxruntime-web) run in the visitor's browser, in a Web Worker.
+# Production deploys from main; branch deploys (<branch>--<site>.netlify.app) test first.
+
+[build]
+  base = "web"
+  command = "npm run build:wasm"
+  publish = "out"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Module workers refuse scripts served with a non-JavaScript type.
+[[headers]]
+  for = "/wasm/objrec.mjs"
+  [headers.values]
+    Content-Type = "text/javascript"
+
+[[headers]]
+  for = "/ort/ort-wasm-simd-threaded.jsep.mjs"
+  [headers.values]
+    Content-Type = "text/javascript"
+
+# Several MB of wasm per visit otherwise; must-revalidate keeps a redeploy from serving stale code.
+[[headers]]
+  for = "/wasm/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/ort/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

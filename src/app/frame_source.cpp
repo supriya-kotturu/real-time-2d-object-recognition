@@ -5,24 +5,14 @@
 #include <filesystem>
 #include <opencv2/imgcodecs.hpp>
 
+#include "app/dataset.h"
+
 namespace fs = std::filesystem;
-
-namespace {
-
-bool isImageFile(const fs::path& p) {
-    std::string ext = p.extension().string();
-    std::transform(ext.begin(), ext.end(), ext.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp";
-}
-
-}  // namespace
 
 FrameSource::FrameSource(const std::string& spec) {
     const bool isCameraIndex =
-        !spec.empty() && std::all_of(spec.begin(), spec.end(), [](unsigned char c) {
-            return std::isdigit(c);
-        });
+        !spec.empty() &&
+        std::all_of(spec.begin(), spec.end(), [](unsigned char c) { return std::isdigit(c); });
 
     if (isCameraIndex) {
         cap_.open(std::stoi(spec));

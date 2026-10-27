@@ -29,6 +29,11 @@ endif()
 add_library(objrec_core STATIC
 	src/core/threshold.cpp
 	src/core/morphology.cpp
+	src/core/regions.cpp
+	src/core/features.cpp
+	src/core/classifier.cpp
+	src/core/evaluation.cpp
+	src/core/preprocess.cpp
 )
 target_include_directories(objrec_core PUBLIC "${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(objrec_core PUBLIC opencv_core opencv_imgproc)
@@ -36,9 +41,19 @@ target_link_libraries(objrec_core PUBLIC opencv_core opencv_imgproc)
 # --- objrec_app: glue shared by executables (input sources, windows, CSV) ---
 add_library(objrec_app STATIC
 	src/app/frame_source.cpp
+	src/app/pipeline.cpp
+	src/app/overlay.cpp
+	src/app/feature_db.cpp
+	src/app/capture.cpp
+	src/app/dataset.cpp
+	src/app/auto_learn.cpp
+	src/app/embedding.cpp
+	src/app/frame_mailbox.cpp
+	src/app/roi.cpp
+	src/app/session.cpp
 )
 target_include_directories(objrec_app PUBLIC "${PROJECT_SOURCE_DIR}/include")
-target_link_libraries(objrec_app PUBLIC ${OpenCV_LIBS})
+target_link_libraries(objrec_app PUBLIC objrec_core ${OpenCV_LIBS})
 
 if(WIN32)
 	file(GLOB OPENCV_RUNTIME_DLLS "${OpenCV_DIR}/x64/*/bin/*.dll" "${OpenCV_DIR}/bin/*.dll")
@@ -58,4 +73,17 @@ endfunction()
 
 # D-04 option B: one lean executable per job.
 add_objrec_executable(live src/apps/live.cpp)
+add_objrec_executable(inspect src/apps/inspect.cpp)
+add_objrec_executable(train src/apps/train.cpp)
+add_objrec_executable(eval src/apps/eval.cpp)
+add_objrec_executable(invariance src/apps/invariance.cpp)  # extension
 add_objrec_executable(tests tests/morphology_tests.cpp)  # D-05
+add_objrec_executable(autolearn_tests tests/auto_learn_tests.cpp)  # D-15
+add_objrec_executable(embedding_tests tests/embedding_tests.cpp)  # D-18
+add_objrec_executable(mailbox_tests tests/frame_mailbox_tests.cpp)  # D-24
+add_objrec_executable(classifier_tests tests/classifier_tests.cpp)  # D-25
+
+# Web GUI backend (D-13). cpp-httplib v0.60.1 is vendored header-only; SYSTEM keeps its
+# warnings out of our /W4 output.
+add_objrec_executable(server src/apps/server.cpp)
+target_include_directories(server SYSTEM PRIVATE "${PROJECT_SOURCE_DIR}/third_party/cpp-httplib")

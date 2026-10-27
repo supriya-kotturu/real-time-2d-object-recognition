@@ -2,11 +2,12 @@
 
 Rules:
 - **+1** — a visible improvement (cleaner reasoning, a bug caught on your own, a better trade-off call, idiomatic C++ where before it wasn't).
+- From D-11 on, agent-built parts earn/lose points in review: each part gets an explain-it-back check.
 - **−1** — a hint already given (listed in `hints.md`) has to be given again.
 - Progress update every 6h of active work. Measured from the `Last update` timestamp below; checked at the start of every session.
 
-**Total: +6**
-**Last update:** 2026-10-24 ~00:00 (checkpoint 1). Next one due after 6 more hours of work.
+**Total: +13**
+**Last update:** 2026-10-25 ~01:00 (checkpoint 3). Next one due after 6 more hours of work.
 
 ## Ledger
 
@@ -43,6 +44,23 @@ Rules:
 | 2026-10-23 | −1 | Namespace still `morphology` after being asked to keep `objectrecognition` (logged as H-38) | H-38 |
 | 2026-10-23 | +1 | morphology.h compiles: void return types, const inputs, project namespace, OpenCV-style param order | H-36, H-38, H-39 |
 | 2026-10-24 | +1 | Scoped by grading value: swapped from-scratch T3 for OpenCV to free time for extensions (base caps at 26/30) | D-09 |
+| 2026-10-24 | +1 | DB format: rejected the header row via YAGNI on your own ("no one opens it; change the code if needed") | H-17 |
+| 2026-10-24 | +1 | Designed GUI modes (detect w/ auto-learn prompt vs collect) that map directly onto the task's evaluation hook + auto-learn extension | D-15 |
+| 2026-10-24 | +1 | Rejected YOLO on concrete costs (per-class retraining, no server compute on Netlify) instead of hype | D-16 |
+| 2026-10-24 | +1 | Spotted that a burst of near-identical frames gives no pose diversity (also the root cause of the zero-stdev bug); proposed per-pose capture | D-17 |
+| 2026-10-24 | −1 | H-34 repeated: INF reasoned from CV_8UC1, but the distance image is CV_32S (D-08); INT_MAX + 1 overflows | H-34 |
+| 2026-10-24 | +1 | Grassfire pseudocode: backward-pass rule exactly right (`min(curr, min(DOWN,RIGHT)+1)`) and border = bg applied from D-08 without prompting | H-06, D-08 |
+| 2026-10-24 | −1 | H-33 repeated: `dest.setTo(INFINITY)` initialises every pixel to INF; bg must start at 0 | H-33 |
+| 2026-10-24 | −1 | H-42 repeated (one message after it was given): distance image created as `frame.type()` (CV_8UC1) and INF = float INFINITY | H-42 |
+| 2026-10-24 | +1 | Correct 8-conn neighbour sets for both passes; INF = rows + cols; forward pass restricted to fg | H-32, H-42 |
+| 2026-10-24 | −1 | H-33 repeated (2nd time): every pixel still set to INF; bg must start at 0 | H-33 |
+| 2026-10-24 | −1 | H-45 repeated: local distance Mat put inside grassfire instead of shrink/grow; grassfire's own output became CV_8UC1 | H-45 |
+| 2026-10-24 | +1 | shrink comparison fixed to `<= n` by checking it against the test case (awarded in session, logged late at checkpoint 2) | D-05 |
+| 2026-10-24 | +1 | Session 2: caught on your own that a browser→server.exe design has no home on Netlify ("where will the camera server be?"), i.e. applied the D-13 WebRTC objection unprompted | D-24 |
+| 2026-10-24 | +1 | Proposed running the model in a Web Worker with no server (H-03 applied unprompted, back to your own D-03 plan) when hosting got expensive; it became D-27 and shipped. Pipeline half was missing (probe still open) | D-27 |
+| 2026-10-24 | +1 | Live test: noticed the OBB sat on the phone's camera module, not the phone, i.e. the error was segmentation (T1/T3), not classification | T3 |
+| 2026-10-24 | +1 | Explained the failure chain from the Threshold/Regions views: hand merged with the phone, touched the border, region rejected, camera ring won (answers the T3 explain-it-back check) | T3, D-08 |
+| 2026-10-24 | +1 | Theme review: asked whether the lime box stays visible on the bright paper before it shipped (it would not: led to the halo overlay) | D-28 |
 
 ## Progress updates
 
@@ -64,3 +82,36 @@ Rules:
 
 **Next focus:** grassfire bodies passing `tests.exe`; read the warnings before asking.
 
+
+### Checkpoint 2: 2026-10-24 ~18:00 (00:00 → 18:00, ~10 h of active work)
+
+**Score: +8** (25 earned, 17 lost). Trend: +6 → peaked at +10 → dipped to +7 during grassfire → +8.
+
+**Strengths**
+- **Product and architecture judgment is now the strongest skill.** You chose the browser-side compute for Netlify, rejected YOLO on cost, proposed per-pose capture (which found the root cause of a real bug), designed the 3 GUI modes, and picked option (a) for the border rule from evidence.
+- You question data instead of trusting it: verified captures, accepted the audit's rejects, and kept hard test cases.
+- You're honest about where code came from ("got it from Google", "autofill did it"), which kept review accurate.
+
+**Recurring gaps**
+1. **Image/data-type bookkeeping in C++** (most of the losses this period): which Mat is input vs output, CV_8U vs CV_32S, and initialising bg/fg (H-33 ×2, H-42, H-45). One rule fixes most of it: *read the input, write the output, and the output's type follows its meaning* (H-49).
+2. **Unanswered questions:** the closing-gap numbers, the explain-it-back checks, and the T3/T4/T6 review checks are still open. These are what the 2-point Q&A will probe.
+3. **Pseudocode → code jumps:** code got written before the pseudocode round finished, and gaps carried over.
+
+**Next focus:** answer the explain-it-back and review checks (Q&A prep, D-20 condition), then the demo video and report.
+
+
+### Checkpoint 3: 2026-10-25 ~01:00 (session 2, ~18:00 → 01:00, ~7 h of active work)
+
+**Score: +13** (+5 this session, no losses). Trend: +8 → +13, the first period with no repeated hints.
+
+**Strengths**
+- **Architecture judgment, again the strongest skill.** You caught that a browser→server design has no home on Netlify; when hosting turned out to cost money you proposed the serverless worker yourself (D-27), and it shipped, with the C++ running bit-identically in the browser.
+- **Debugging from evidence.** The phone test: you read the Threshold/Regions views and traced "ball" to segmentation (hand merged, border rule, camera ring), not to the classifier. That is exactly the reasoning the Q&A rewards.
+- **Product sense.** Contrast of the lime box on white paper, persistence across refresh, a gallery with delete: all caught before users hit them.
+
+**Recurring gaps**
+1. **Questions skipped or half-answered (the main one).** The frame → ResNet18 probe took four asks; the two-part questions (closed-set NN, skin masking, face test) were answered on one part only. The Q&A will ask both halves.
+2. **Location vs mechanism.** You point at the right function (`extractAlignedRoi`) or quote its comment, but stop before explaining *how* it works (which angle, from which task, why the 180° flip). Practise saying the mechanism out loud.
+3. **Closed-set intuition.** "ResNet can detect any image" → it only *compares* against stored examples. Worth one sentence in the report.
+
+**Next focus:** the explain-it-back list (grassfire ×3, T3, T4, T6) answered in full, both halves; then the report images and the T8 video.

@@ -88,37 +88,21 @@ void check(const std::string& name, const cv::Mat& actual, const Grid& expected)
 // ---- Inputs (0 = background, 1 = foreground) ----
 
 const Grid kBlock3In5 = {
-    {0, 0, 0, 0, 0},
-    {0, 1, 1, 1, 0},
-    {0, 1, 1, 1, 0},
-    {0, 1, 1, 1, 0},
-    {0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0}, {0, 1, 1, 1, 0}, {0, 1, 1, 1, 0}, {0, 1, 1, 1, 0}, {0, 0, 0, 0, 0},
 };
 
 const Grid kFull5 = {
-    {1, 1, 1, 1, 1},
-    {1, 1, 1, 1, 1},
-    {1, 1, 1, 1, 1},
-    {1, 1, 1, 1, 1},
-    {1, 1, 1, 1, 1},
+    {1, 1, 1, 1, 1}, {1, 1, 1, 1, 1}, {1, 1, 1, 1, 1}, {1, 1, 1, 1, 1}, {1, 1, 1, 1, 1},
 };
 
-const Grid kHole7 = {  // one background pixel in the centre of a 7x7 foreground
-    {1, 1, 1, 1, 1, 1, 1},
-    {1, 1, 1, 1, 1, 1, 1},
-    {1, 1, 1, 1, 1, 1, 1},
-    {1, 1, 1, 0, 1, 1, 1},
-    {1, 1, 1, 1, 1, 1, 1},
-    {1, 1, 1, 1, 1, 1, 1},
-    {1, 1, 1, 1, 1, 1, 1},
+const Grid kHole7 = {
+    // one background pixel in the centre of a 7x7 foreground
+    {1, 1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 1, 1}, {1, 1, 1, 0, 1, 1, 1},
+    {1, 1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 1, 1},
 };
 
 const Grid kDot5 = {
-    {0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0},
-    {0, 0, 1, 0, 0},
-    {0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 1, 0, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0},
 };
 
 void gridTests() {
@@ -126,13 +110,14 @@ void gridTests() {
 
     // Your hand-computed grid from the session.
     orec::grassfire(toBinary(kBlock3In5), out, Connectivity::Four);
-    check("grassfire 4-conn: 3x3 block in 5x5", out, {
-        {0, 0, 0, 0, 0},
-        {0, 1, 1, 1, 0},
-        {0, 1, 2, 1, 0},
-        {0, 1, 1, 1, 0},
-        {0, 0, 0, 0, 0},
-    });
+    check("grassfire 4-conn: 3x3 block in 5x5", out,
+          {
+              {0, 0, 0, 0, 0},
+              {0, 1, 1, 1, 0},
+              {0, 1, 2, 1, 0},
+              {0, 1, 1, 1, 0},
+              {0, 0, 0, 0, 0},
+          });
 
     out.release();
     orec::grassfire(toBinary(kBlock3In5), out, Connectivity::Eight);
@@ -153,13 +138,30 @@ void gridTests() {
     // Worked example: everything within distance 1 of background is removed.
     out.release();
     orec::shrink(toBinary(kBlock3In5), out, Connectivity::Four, 1);
-    check("shrink 1, 4-conn: 3x3 block -> centre pixel", out, {
-        {0, 0, 0, 0, 0},
-        {0, 0, 0, 0, 0},
-        {0, 0, 1, 0, 0},
-        {0, 0, 0, 0, 0},
-        {0, 0, 0, 0, 0},
-    });
+    check("shrink 1, 4-conn: 3x3 block -> centre pixel", out,
+          {
+              {0, 0, 0, 0, 0},
+              {0, 0, 0, 0, 0},
+              {0, 0, 1, 0, 0},
+              {0, 0, 0, 0, 0},
+              {0, 0, 0, 0, 0},
+          });
+
+    // Regression (D-08 revisited): a band touching the left edge must still touch it after a
+    // shrink, or T3's border filter can't see objects cut off by the frame.
+    out.release();
+    const Grid edgeBand = {
+        {1, 1, 1, 0, 0}, {1, 1, 1, 0, 0}, {1, 1, 1, 0, 0}, {1, 1, 1, 0, 0}, {1, 1, 1, 0, 0},
+    };
+    orec::shrink(toBinary(edgeBand), out, Connectivity::Four, 1);
+    check("shrink 1 keeps an edge-touching object touching the edge", out,
+          {
+              {1, 1, 0, 0, 0},
+              {1, 1, 0, 0, 0},
+              {1, 1, 0, 0, 0},
+              {1, 1, 0, 0, 0},
+              {1, 1, 0, 0, 0},
+          });
 
     out.release();
     orec::grow(toBinary(kDot5), out, Connectivity::Four, 1);

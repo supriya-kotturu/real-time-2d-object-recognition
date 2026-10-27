@@ -1,0 +1,14 @@
+# Only what the Dockerfile COPYs is needed; everything else would slow every build upload.
+.git
+build/
+out/
+docs/
+data/objects/
+data/test/
+data/rejected/
+data/models/
+web/node_modules/
+web/.next/
+web/out/
+**/*.pdb
+**/*.exe
