@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://real-time-2d-object-recognition.netlify.app/sitemap.xml

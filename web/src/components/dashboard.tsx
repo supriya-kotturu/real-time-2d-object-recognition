@@ -111,6 +111,15 @@ export function Dashboard() {
           <FeaturesCard object={status?.object ?? null} />
         </section>
       </div>
+      <footer className="dashboard-footer">
+        <span>Built by Supriya Kotturu</span>
+        <a href="https://github.com/supriya-kotturu/real-time-2d-object-recognition" target="_blank" rel="noreferrer">
+          GitHub
+        </a>
+        <a href="https://www.linkedin.com/in/supriya-kotturu" target="_blank" rel="noreferrer">
+          LinkedIn
+        </a>
+      </footer>
     </main>
   );
 }

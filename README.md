@@ -1,8 +1,5 @@
 # Silhouette: real-time 2-D object recognition
 
-CS5330 Pattern Recognition and Computer Vision, Project 3 (Northeastern University, Fall 2026).
-**Sai Supriya Kotturu.**
-
 Silhouette recognises objects lying on a plain, light background from a top-down camera. It
 segments the object, describes its shape with translation-, scale- and rotation-invariant
 features, and names it by nearest neighbour against a trained database. A second classifier
