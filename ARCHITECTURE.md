@@ -112,7 +112,7 @@ sequenceDiagram
 ```
 
 - **Live view (D-29).** The annotated view shows the camera itself at full frame rate and draws the box, axis and label as SVG from the latest status. Before this, the picture refreshed only as fast as recognition ran.
-- **Model (D-27).** ResNet18 comes straight from the ONNX model zoo's file host and is checked against the pinned SHA-256. onnxruntime returns only declared outputs, so the worker splices a 46-byte protobuf field into the model to declare the embedding layer as an output; the weights are untouched.
+- **Model (D-27, D-30).** The site serves ResNet18 itself: the build copies the ONNX model zoo's file into `public/models/` (downloading it if `data/models/` has no matching copy), and the worker checks it against the pinned SHA-256. Fetching the zoo's file host from the browser failed on networks that block it. onnxruntime returns only declared outputs, so the worker splices a 46-byte protobuf field into the model to declare the embedding layer as an output; the weights are untouched.
 - **Speed.** Hand features ~10 fps. ResNet18 ~15 fps on WebGPU, ~3.6 fps on single-threaded WebAssembly.
 - **Correctness.** The WebAssembly build gives the same thresholds, features and predictions as `server.exe` (relative difference 0), and the browser embedding matches OpenCV dnn's (cosine distance 8e-8).
 
@@ -159,9 +159,9 @@ sequenceDiagram
 ```mermaid
 flowchart LR
     GH[GitHub main] --> N[Netlify build<br/>npm run build:wasm]
-    N --> O["web/out (static)<br/>HTML/JS · objrec.wasm · ORT runtime · DB CSVs · samples"]
+    N --> O["web/out (static)<br/>HTML/JS · objrec.wasm · ORT runtime · ResNet18 · DB CSVs · samples"]
+    Z[ONNX model zoo] -- "ResNet18, SHA-256 checked" --> N
     O --> B[Browser]
-    Z[ONNX model zoo] -- "ResNet18, fetched by the worker" --> B
 ```
 
 [netlify.toml](netlify.toml) sets JavaScript content types for the `.mjs` modules (module

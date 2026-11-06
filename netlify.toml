@@ -31,3 +31,9 @@
   for = "/ort/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# 47 MB, pinned by SHA-256 (D-30): a returning visitor never downloads it again.
+[[headers]]
+  for = "/models/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

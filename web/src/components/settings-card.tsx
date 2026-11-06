@@ -101,7 +101,7 @@ export function SettingsCard({ status }: { status: Status | null }) {
         />
         {USE_WASM && model.state === "loading" && (
           <p className="setting-note">
-            Downloading ResNet18 from the ONNX model zoo (47 MB, once; your browser caches it):{" "}
+            Downloading ResNet18 (47 MB, once; your browser caches it):{" "}
             {Math.round(model.progress * 100)}%. Hand features work meanwhile.
           </p>
         )}
