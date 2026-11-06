@@ -392,3 +392,13 @@ Phone layout fine; back camera; trained "phone" with 3 samples in the browser; l
 
 New objects whose silhouette resembles a trained one (round tin vs batteries, snack bag vs notebook at distance 0.301 / cutoff 0.350) flicker between a known label and unknown. Cause: one "known" frame resets the 3 s hold ([auto_learn.cpp](../../src/app/auto_learn.cpp) `update`), so a borderline object never stays unknown for 3 s straight. Workaround used in the demo: cutoff lowered to 0.200 (costs false unknowns on trained objects under lighting changes).
 **Further improvement (yours, not built):** decide on the fraction of frames in the hold window that read unknown (e.g. ≥ 80%) instead of requiring every frame; one noisy frame then no longer erases the hold. Related: hysteresis (separate enter/leave cutoffs) or smoothing the distance over frames.
+
+## D-30 — Serve ResNet18 from the site (decided 2026-11-06)
+
+**Problem (yours):** the deployed site showed "ResNet18 unavailable: Failed to fetch". The browser fetched the model from the zoo's LFS host (`media.githubusercontent.com`, D-27), and some networks block that host: from your machine its TLS handshake fails while `github.com` and `raw.githubusercontent.com` work. The code was fine (the local copy matches the pinned SHA-256).
+**Options:** (A) the site serves the model itself; (B) keep the zoo and fall back to a mirror (e.g. Hugging Face) on failure; (C) keep it as is and document the requirement.
+**Trade-offs:** A adds 47 MB to every deploy but works wherever the site loads and drops the third-party host and CORS; B keeps deploys small but depends on two outside hosts, which can both be blocked, and needs more code; C costs nothing, but visitors on filtering networks (offices, schools) silently lose ResNet18.
+**Your call: A.** It's a static site that rarely gets redeployed, so the deploy size hardly matters.
+**Built:** `web/scripts/wasm.mjs` copies the model into `public/models/` at build time. It reuses `data/models/` when that copy matches the pin; otherwise it downloads the file and checks it (on the server, so CORS doesn't apply). Weights stay out of git (D-18). The worker fetches `/models/resnet18-v2-7.onnx` from the site and still checks the SHA-256 (D-19). Netlify caches `/models/*` as immutable, since the content is pinned.
+**Verified:** a local static build in headless Chrome fetched the model from the site, and the classifier card reported "Running on your GPU via WebGPU".
+**Open:** the build-time download path is untested here, because this network blocks the zoo host. The first Netlify build exercises it: check its log and the branch deploy.

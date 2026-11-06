@@ -2,8 +2,8 @@ flowchart TB
     user["User<br/>phone or laptop camera"]:::client
 
     subgraph host["Static hosting: no backend server"]
-        netlify["Netlify<br/>Next.js static export<br/>objrec.wasm · trained DB CSVs"]:::hosting
-        zoo["ONNX model zoo<br/>resnet18-v2-7.onnx<br/>SHA-256 checked"]:::hosting
+        zoo["ONNX model zoo<br/>resnet18-v2-7.onnx"]:::hosting
+        netlify["Netlify<br/>Next.js static export<br/>objrec.wasm · trained DB CSVs<br/>ResNet18, SHA-256 checked"]:::hosting
     end
 
     subgraph browser["Browser tab"]
@@ -30,7 +30,8 @@ flowchart TB
     user -->|camera frames| gui
     netlify -->|GUI page| gui
     netlify -->|objrec.wasm, DB CSVs| wasm
-    zoo -->|model, downloaded once| ort
+    zoo -->|model, at build time| netlify
+    netlify -->|model, downloaded once| ort
     gui -->|frame, transferred| t1
     t1 --> t2 --> t3 --> t4
     t4 -->|ResNet18 selected| roi

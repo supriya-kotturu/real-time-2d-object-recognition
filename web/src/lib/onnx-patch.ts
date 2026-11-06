@@ -1,13 +1,12 @@
 // D-27: onnxruntime can only return a model's declared outputs, but the T9 embedding is the
 // internal tensor after global average pooling (server.exe reads it by layer name through
-// OpenCV dnn). Rather than re-hosting a modified 47 MB model, the browser downloads the
-// original from the ONNX zoo, checks its SHA-256 (D-18, D-19), and declares that tensor as an
+// OpenCV dnn). Rather than shipping a modified 47 MB model, the browser downloads the
+// original zoo file, checks its SHA-256 (D-18, D-19), and declares that tensor as an
 // extra graph output by splicing one protobuf field into the bytes. Weights are untouched.
 
-// The zoo's LFS host directly: the github.com/.../raw/ URL in data/models/README.md redirects
-// here, and that redirect carries no CORS header, so browsers refuse to follow it.
-export const MODEL_URL =
-  "https://media.githubusercontent.com/media/onnx/models/main/validated/vision/classification/resnet/model/resnet18-v2-7.onnx";
+// D-30: served by the site itself (scripts/wasm.mjs puts it in public/models/ at build time).
+// Fetching the zoo's LFS host from the browser failed on networks that block that host.
+export const MODEL_URL = "/models/resnet18-v2-7.onnx";
 export const MODEL_SHA256 = "3b4d048057854022232aa20bf68262e31718ab7119a17f920b8a2dc1433f824b";
 export const EMBEDDING_OUTPUT = "resnetv22_flatten0_reshape0";
 
